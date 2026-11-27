@@ -86,7 +86,80 @@ contract BlueskyResolverTest is Test {
     function test_supportsInterface() public view {
         assertTrue(resolver.supportsInterface(0x01ffc9a7)); // ERC-165
         assertTrue(resolver.supportsInterface(0x9061b923)); // IExtendedResolver
+        assertTrue(resolver.supportsInterface(0x582de3e7)); // IERC7996
         assertFalse(resolver.supportsInterface(0xffffffff));
+    }
+
+    function test_supportsFeature() public view {
+        assertEq(resolver.RESOLVE_MULTICALL(), bytes4(0x96b62db8)); // ENS ResolverFeatures.RESOLVE_MULTICALL
+        assertTrue(resolver.supportsFeature(0x96b62db8));
+        assertFalse(resolver.supportsFeature(0x86fb8da8)); // SINGULAR: records depend on the name
+        assertFalse(resolver.supportsFeature(0x00000000));
+    }
+
+    // multicall
+
+    function _multicall(bytes[] memory calls) internal pure returns (bytes memory) {
+        return abi.encodeWithSelector(BlueskyRecords.MULTICALL, calls);
+    }
+
+    function test_multicall() public view {
+        bytes[] memory calls = new bytes[](6);
+        calls[0] = abi.encodeWithSelector(BlueskyRecords.ADDR, bytes32(0));
+        calls[1] = abi.encodeWithSelector(BlueskyRecords.ADDR_COIN, bytes32(0), uint256(60));
+        calls[2] = abi.encodeWithSelector(BlueskyRecords.TEXT, bytes32(0), "avatar");
+        calls[3] = abi.encodeWithSelector(BlueskyRecords.TEXT, bytes32(0), "description");
+        calls[4] = abi.encodeWithSelector(0x12345678, bytes32(0)); // unsupported profile
+        calls[5] = _multicall(new bytes[](0)); // nested multicall
+        bytes[] memory res = abi.decode(_callback(_multicall(calls)), (bytes[]));
+        assertEq(res.length, calls.length);
+        address eth = vm.parseJsonAddress(json, ".expected.eth");
+        // each answer matches the single-call answer
+        for (uint256 i; i < 4; i++) {
+            assertEq(res[i], _callback(calls[i]));
+        }
+        assertEq(abi.decode(res[0], (address)), eth);
+        assertEq(abi.decode(res[1], (bytes)), abi.encodePacked(eth));
+        assertEq(abi.decode(res[2], (string)), vm.parseJsonString(json, ".expected.avatar"));
+        // failures are revert data with length % 32 == 4
+        assertEq(res[4], abi.encodeWithSelector(BlueskyRecords.UnsupportedResolverProfile.selector, bytes4(0x12345678)));
+        assertEq(res[5], abi.encodeWithSelector(BlueskyRecords.UnsupportedResolverProfile.selector, BlueskyRecords.MULTICALL));
+        assertEq(res[4].length % 32, 4);
+    }
+
+    function test_multicall_empty() public view {
+        bytes[] memory res = abi.decode(_callback(_multicall(new bytes[](0))), (bytes[]));
+        assertEq(res.length, 0);
+    }
+
+    function test_multicall_shortCall() public view {
+        bytes[] memory calls = new bytes[](2);
+        calls[0] = hex"3b3b57de"; // addr(bytes32) selector without its argument
+        calls[1] = hex"";
+        bytes[] memory res = abi.decode(_callback(_multicall(calls)), (bytes[]));
+        assertEq(res[0], abi.encodeWithSelector(BlueskyRecords.UnsupportedResolverProfile.selector, BlueskyRecords.ADDR));
+        assertEq(res[1], abi.encodeWithSelector(BlueskyRecords.UnsupportedResolverProfile.selector, bytes4(0)));
+    }
+
+    function test_singleCall_unsupportedReverts() public {
+        vm.expectRevert(abi.encodeWithSelector(BlueskyRecords.UnsupportedResolverProfile.selector, bytes4(0x12345678)));
+        resolver.resolveCallback(_response(_proof()), abi.encode(HANDLE, abi.encodeWithSelector(0x12345678, bytes32(0))));
+    }
+
+    function test_resolve_multicall_revertsOffchainLookup() public {
+        // the gateway request is the same; the multicall rides along in extraData
+        bytes memory data = _multicall(new bytes[](2));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BlueskyResolver.OffchainLookup.selector,
+                address(resolver),
+                resolver.gateways(),
+                abi.encodeCall(IBlueskyGateway.proveProfile, (string(HANDLE))),
+                resolver.resolveCallback.selector,
+                abi.encode(HANDLE, data)
+            )
+        );
+        resolver.resolve(NAME, data);
     }
 
     function test_config() public view {

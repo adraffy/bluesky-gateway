@@ -8,6 +8,11 @@ interface IERC165 {
     function supportsInterface(bytes4 interfaceId) external view returns (bool);
 }
 
+/// @notice ERC-7996: contract features not visible from the ABI
+interface IERC7996 {
+    function supportsFeature(bytes4 featureId) external view returns (bool);
+}
+
 interface IExtendedResolver {
     function resolve(bytes calldata name, bytes calldata data) external view returns (bytes memory);
 }
@@ -31,11 +36,14 @@ interface IBlueskyGateway {
 /// Records are proven from the account's signed atproto repo. The gateway is untrusted: handle -> did
 /// is accepted when the account's latest PLC op claims the handle and was signed by one of the
 /// anchor DID's rotation keys (Bluesky's PLC signers). Immutable: no owner, all config is set at deployment.
-contract BlueskyResolver is IERC165, IExtendedResolver {
+contract BlueskyResolver is IERC165, IERC7996, IExtendedResolver {
     error OffchainLookup(address sender, string[] urls, bytes callData, bytes4 callbackFunction, bytes extraData);
     error UnsupportedName(bytes name);
 
     bytes constant HANDLE_SUFFIX = ".bsky.social";
+
+    /// @notice ENS ResolverFeatures.RESOLVE_MULTICALL: implements `resolve(name, multicall([...]))`
+    bytes4 public constant RESOLVE_MULTICALL = bytes4(keccak256("eth.ens.resolver.extended.multicall"));
 
     bytes32 public immutable parent;
     uint256 public immutable maxAge;
@@ -59,7 +67,12 @@ contract BlueskyResolver is IERC165, IExtendedResolver {
     }
 
     function supportsInterface(bytes4 x) external pure returns (bool) {
-        return x == type(IERC165).interfaceId || x == type(IExtendedResolver).interfaceId;
+        return x == type(IERC165).interfaceId || x == type(IERC7996).interfaceId
+            || x == type(IExtendedResolver).interfaceId;
+    }
+
+    function supportsFeature(bytes4 featureId) external pure returns (bool) {
+        return featureId == RESOLVE_MULTICALL;
     }
 
     /// @notice "{label}.<parent>" -> "{label}.bsky.social"
@@ -87,6 +100,7 @@ contract BlueskyResolver is IERC165, IExtendedResolver {
         );
     }
 
+    /// @notice verifies the proof once, then answers `data`: one record call, or `multicall(bytes[])`
     /// @param response ABI-encoded return value of proveProfile() (ezccip "raw" protocol)
     function resolveCallback(bytes calldata response, bytes calldata extraData) external view returns (bytes memory) {
         (bytes memory handle, bytes memory data) = abi.decode(extraData, (bytes, bytes));

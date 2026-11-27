@@ -11,27 +11,59 @@ library BlueskyRecords {
     bytes4 constant ADDR = 0x3b3b57de; // addr(bytes32)
     bytes4 constant ADDR_COIN = 0xf1cb7e06; // addr(bytes32,uint256)
     bytes4 constant TEXT = 0x59d1d43c; // text(bytes32,string)
+    bytes4 constant MULTICALL = 0xac9650d8; // multicall(bytes[])
 
     uint256 constant COIN_ETH = 60;
     uint256 constant COIN_DEFAULT_EVM = 0x80000000;
 
     bytes constant AVATAR_CDN = "https://cdn.bsky.app/img/avatar/plain/";
 
+    /// @notice answers a record call, or `multicall(bytes[])` of record calls.
+    /// Multicall follows ENS resolve-multicall: returns `abi.encode(bytes[])` where each result is the
+    /// ABI-encoded answer, or the call's revert data padded to `length % 32 == 4`. Nested multicalls fail.
     function answer(BlueskyVerifier.Profile memory p, bytes memory data) internal pure returns (bytes memory) {
-        bytes4 selector = bytes4(data);
-        if (selector == ADDR) {
-            (bool ok, address a) = ethAddress(p);
-            return abi.encode(ok ? a : address(0));
-        } else if (selector == ADDR_COIN) {
-            (, uint256 coinType) = abi.decode(_args(data), (bytes32, uint256));
-            if (coinType != COIN_ETH && coinType != COIN_DEFAULT_EVM) return abi.encode(bytes(""));
-            (bool ok, address a) = ethAddress(p);
-            return abi.encode(ok ? abi.encodePacked(a) : bytes(""));
-        } else if (selector == TEXT) {
-            (, string memory key) = abi.decode(_args(data), (bytes32, string));
-            return abi.encode(string(text(p, bytes(key))));
+        if (bytes4(data) == MULTICALL) {
+            bytes[] memory calls = abi.decode(_args(data), (bytes[]));
+            bytes[] memory results = new bytes[](calls.length);
+            for (uint256 i; i < calls.length; i++) {
+                (bool ok, bytes memory v) = _answer(p, calls[i]);
+                results[i] = ok ? v : _padError(v);
+            }
+            return abi.encode(results);
         }
-        revert UnsupportedResolverProfile(selector);
+        (bool ok, bytes memory v) = _answer(p, data);
+        if (!ok) {
+            assembly {
+                revert(add(v, 32), mload(v))
+            }
+        }
+        return v;
+    }
+
+    /// @return ok, and the ABI-encoded answer (or revert data)
+    function _answer(BlueskyVerifier.Profile memory p, bytes memory data) private pure returns (bool, bytes memory) {
+        bytes4 selector = bytes4(data);
+        if (selector == ADDR && data.length >= 36) {
+            (bool ok, address a) = ethAddress(p);
+            return (true, abi.encode(ok ? a : address(0)));
+        } else if (selector == ADDR_COIN && data.length >= 68) {
+            (, uint256 coinType) = abi.decode(_args(data), (bytes32, uint256));
+            if (coinType != COIN_ETH && coinType != COIN_DEFAULT_EVM) return (true, abi.encode(bytes("")));
+            (bool ok, address a) = ethAddress(p);
+            return (true, abi.encode(ok ? abi.encodePacked(a) : bytes("")));
+        } else if (selector == TEXT && data.length >= 100) {
+            (, string memory key) = abi.decode(_args(data), (bytes32, string));
+            return (true, abi.encode(string(text(p, bytes(key)))));
+        }
+        return (false, abi.encodeWithSelector(UnsupportedResolverProfile.selector, selector));
+    }
+
+    /// @notice pads revert data to `length % 32 == 4` so it can't be mistaken for an ABI-encoded answer
+    function _padError(bytes memory v) private pure returns (bytes memory) {
+        unchecked {
+            uint256 pad = (4 - v.length) & 31;
+            return pad == 0 ? v : bytes.concat(v, new bytes(pad));
+        }
     }
 
     function _args(bytes memory data) private pure returns (bytes memory) {

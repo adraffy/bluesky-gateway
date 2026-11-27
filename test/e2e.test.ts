@@ -4,7 +4,7 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { Foundry } from '@adraffy/blocksmith';
 import { serveEZCCIP } from '@adraffy/ezccip/serve';
-import { EnsResolver, dnsEncode, namehash, toUtf8Bytes } from 'ethers';
+import { EnsResolver, Interface, dnsEncode, namehash, toUtf8Bytes } from 'ethers';
 import { createGateway } from '../src/gateway.js';
 import { fetchProof, ANCHOR_DID } from '../src/bluesky.js';
 import { verifyProof } from '../src/verify.js';
@@ -46,6 +46,22 @@ test('resolve() via CCIP-Read', async () => {
 	expect(await ens.getText('avatar')).toBe(expected.avatar ?? '');
 	expect(await ens.getText('description')).toBe(expected.description ?? '');
 	expect(await ens.getText('com.github')).toBe('');
+}, 60_000);
+
+test('resolve(name, multicall([...])) in one CCIP-Read round trip', async () => {
+	const abi = new Interface([
+		'function addr(bytes32) view returns (address)',
+		'function text(bytes32, string) view returns (string)',
+		'function multicall(bytes[]) view returns (bytes[])',
+	]);
+	const node = namehash(NAME);
+	const calls = [abi.encodeFunctionData('addr', [node]), abi.encodeFunctionData('text', [node, 'avatar'])];
+	const answer = await resolver.resolve(dnsEncode(NAME), abi.encodeFunctionData('multicall', [calls]), {
+		enableCcipRead: true,
+	});
+	const [results] = abi.decodeFunctionResult('multicall', answer);
+	expect(abi.decodeFunctionResult('addr', results[0])[0]).toBe(expected.eth!);
+	expect(abi.decodeFunctionResult('text', results[1])[0]).toBe(expected.avatar ?? '');
 }, 60_000);
 
 test('rejects names outside the parent', async () => {

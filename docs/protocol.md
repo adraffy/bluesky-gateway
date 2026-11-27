@@ -123,8 +123,8 @@ genesis op's own keys for the genesis op). Its DID is `"did:plc:" + base32(sha25
 8. **Records:** answered from the verified profile and links (§2).
 
 Signed objects are canonical DAG-CBOR, so the unsigned bytes are rebuilt on-chain by removing the
-`sig` entry from the top-level map. Verification costs about 1.0M gas inside `eth_call` (Solar;
-about 2.3M with solc via-IR); see [gas.md](gas.md).
+`sig` entry from the top-level map. Verification costs about 0.9M gas inside `eth_call` (Solar;
+about 2.0M with solc via-IR); see [gas.md](gas.md).
 
 ## 5. Trust assumptions
 
@@ -175,7 +175,7 @@ resolving (from an honest gateway). If someone else later takes the handle, the 
 - Only an ETH address (coin types 60 and 0x80000000) and the text keys in §2. No contenthash, no
   other coins, no pinned-post records.
 - `text(avatar)` depends on Bluesky's CDN URL format.
-- About 1.1M gas per `eth_call` (1.0M execution + calldata + intrinsic; [gas.md](gas.md)); fine,
+- About 1.0M gas per `eth_call` (0.9M execution + calldata + intrinsic; [gas.md](gas.md)); fine,
   but RPC providers that cap `eth_call` gas
   lower would fail.
 - The end-to-end test uses live Bluesky data and fails if it's unreachable or the profile changes.

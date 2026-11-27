@@ -51,7 +51,7 @@ access and fails if Bluesky is unreachable or the fixture account changes.
 - **Use `@adraffy/ezccip`**, not `@resolverworks/ezccip`.
 - Treat everything the gateway returns as hostile input: bounded parsing, explicit reverts, no
   trust in ordering beyond what hashes and signatures prove.
-- Watch gas: verification is about 1.0M gas in `eth_call` (`forge test --match-contract Gas -vv`,
+- Watch gas: verification is about 0.9M gas in `eth_call` (`forge test --match-contract Gas -vv`,
   see `docs/gas.md`). Avoid per-byte loops over `bytes memory`
   where fixed-width arithmetic works (see `Secp256k1.didKeyToAddress`).
 - Update `docs/protocol.md` when behavior, trust assumptions or limitations change.

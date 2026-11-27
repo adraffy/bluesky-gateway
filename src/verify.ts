@@ -43,14 +43,14 @@ function verifyPlc(encoded: Uint8Array[]) {
 	if (!encoded.length) throw new Error('empty plc chain');
 	const ops = encoded.map((b) => dagCbor.decode(b) as any);
 	const did = 'did:plc:' + base32.baseEncode(sha256(encoded[0])).slice(0, 24);
-	let rotation: Uint8Array[] = ops[0].rotationKeys.map(didKeyToPub);
+	let rotation: Uint8Array[] = ops[0].rotationKeys.map(didKeyToPub); // the genesis op is signed by its own rotation keys
 	let lastSigner: Uint8Array | undefined;
 	ops.forEach((op, i) => {
 		if (op.type !== 'plc_operation') throw new Error(`unsupported op type: ${op.type}`);
 		if (i === 0 ? op.prev !== null : op.prev !== cidOf(encoded[i - 1])) throw new Error(`broken prev at op ${i}`);
 		lastSigner = findSigner(unsigned(op), base64url(op.sig), rotation);
 		if (!lastSigner) throw new Error(`bad op sig at ${i}`);
-		rotation = op.rotationKeys.map(didKeyToPub);
+		if (i > 0) rotation = op.rotationKeys.map(didKeyToPub); // op 0's keys were decoded before the loop
 	});
 	return { did, latest: ops[ops.length - 1], rotation, lastSigner: lastSigner! };
 }

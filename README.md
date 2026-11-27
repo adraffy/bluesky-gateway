@@ -12,13 +12,13 @@ unsigned (ezccip `raw` protocol) and untrusted.
 
 Records (users edit these in the bsky.app profile editor):
 
-| ENS | Source |
-|---|---|
-| `addr(60)`, `addr(0x80000000)` | profile link titled `eth` whose URL ends in `/0x…40 hex`, else `eth:0x…` in the bio |
-| `text(name)` / `text(description)` | display name / bio |
-| `text(avatar)` | avatar blob → `cdn.bsky.app` URL |
-| `text(com.github)`, `text(com.twitter)` | profile links to github.com / x.com / twitter.com |
-| `text(url)` | first other profile link |
+| ENS                                     | Source                                                                              |
+| --------------------------------------- | ----------------------------------------------------------------------------------- |
+| `addr(60)`, `addr(0x80000000)`          | profile link titled `eth` whose URL ends in `/0x…40 hex`, else `eth:0x…` in the bio |
+| `text(name)` / `text(description)`      | display name / bio                                                                  |
+| `text(avatar)`                          | avatar blob → `cdn.bsky.app` URL                                                    |
+| `text(com.github)`, `text(com.twitter)` | profile links to github.com / x.com / twitter.com                                   |
+| `text(url)`                             | first other profile link                                                            |
 
 All of these can be requested together with `resolve(name, multicall([...]))` (ERC-7996 feature
 `eth.ens.resolver.extended.multicall`): one gateway round trip, one verification.
@@ -39,6 +39,7 @@ Contracts compile with [Solar](https://github.com/paradigmxyz/solar) (`solc = "s
 
 ```bash
 bun install && forge build
+bun run lint                           # biome lint + format check (bun run format to fix)
 bun test                               # TS unit + e2e (anvil + gateway + live bsky data)
 forge test                             # Solidity tests against test/fixtures
 bun scripts/fixture.ts adraffy.bsky.social

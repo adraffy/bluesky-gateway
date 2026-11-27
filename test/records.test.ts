@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { addr, text, COIN_ETH, COIN_DEFAULT_EVM } from '../src/records.js';
+import { addr, COIN_DEFAULT_EVM, COIN_ETH, text } from '../src/records.js';
 
 const A = '0x51050ec063d393217B436747617aD1C2285Aeeee';
 const B = '0x000000000000000000000000000000000000dEaD';

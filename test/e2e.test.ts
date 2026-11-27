@@ -7,22 +7,22 @@ import { Foundry } from '@adraffy/blocksmith';
 import { COIN_TYPE_ETH, resolverAbi } from '@adraffy/ezccip';
 import { serveEZCCIP } from '@adraffy/ezccip/serve';
 import {
+	type Address,
 	createPublicClient,
 	decodeFunctionResult,
 	encodeFunctionData,
+	type Hex,
 	http,
+	type PublicClient,
 	parseAbi,
 	stringToHex,
 	toHex,
-	type Address,
-	type Hex,
-	type PublicClient,
 } from 'viem';
 import { namehash, packetToBytes } from 'viem/ens';
+import { ANCHOR_DID, fetchProof } from '../src/bluesky.js';
 import { createGateway } from '../src/gateway.js';
-import { fetchProof, ANCHOR_DID } from '../src/bluesky.js';
+import { addr, COIN_ETH, text } from '../src/records.js';
 import { verifyProof } from '../src/verify.js';
-import { addr, text, COIN_ETH } from '../src/records.js';
 
 const HANDLE = 'adraffy.bsky.social';
 const NAME = 'adraffy.bsky.eth';
@@ -105,7 +105,7 @@ test('resolve() via CCIP-Read', async () => {
 		args: coinArgs,
 		data: await resolve(NAME, encodeFunctionData({ abi: resolverAbi, functionName: 'addr', args: coinArgs })),
 	});
-	expect(coinAddr).toBe(expected.eth!.toLowerCase() as Hex);
+	expect(coinAddr).toBe(expected.eth?.toLowerCase() as Hex);
 
 	expect(await resolveText('avatar')).toBe(expected.avatar ?? '');
 	expect(await resolveText('description')).toBe(expected.description ?? '');
@@ -120,7 +120,10 @@ test('resolve(name, multicall([...])) in one CCIP-Read round trip', async () => 
 		encodeFunctionData({ abi: resolverAbi, functionName: 'addr', args: addrArgs }),
 		encodeFunctionData({ abi: resolverAbi, functionName: 'text', args: textArgs }),
 	];
-	const answer = await resolve(NAME, encodeFunctionData({ abi: resolverAbi, functionName: 'multicall', args: [calls] }));
+	const answer = await resolve(
+		NAME,
+		encodeFunctionData({ abi: resolverAbi, functionName: 'multicall', args: [calls] })
+	);
 	const results = decodeFunctionResult({ abi: resolverAbi, functionName: 'multicall', data: answer });
 	expect(decodeFunctionResult({ abi: resolverAbi, functionName: 'addr', args: addrArgs, data: results[0] })).toBe(
 		expected.eth as Address

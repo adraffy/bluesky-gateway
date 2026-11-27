@@ -3,9 +3,10 @@
 // hashes and signatures. handle -> did is accepted on-chain when the account's latest PLC op
 // claims the handle and was signed by a rotation key of the anchor DID (bsky.app).
 
-import * as dagCbor from '@ipld/dag-cbor';
 import { CarReader } from '@ipld/car';
-import { CID } from 'multiformats/cid';
+import * as dagCbor from '@ipld/dag-cbor';
+import type { CID } from 'multiformats/cid';
+import type { PlcOp, ProfileRecord } from './atproto.js';
 
 export const HANDLE_SUFFIX = '.bsky.social';
 export const PROFILE_KEY = 'app.bsky.actor.profile/self';
@@ -47,14 +48,14 @@ export async function resolveHandle(handle: string): Promise<string> {
 	return did;
 }
 
-export async function fetchPlcOps(did: string): Promise<any[]> {
+export async function fetchPlcOps(did: string): Promise<PlcOp[]> {
 	// /log returns the current valid (non-nullified) chain, genesis first
-	const ops: any[] = await (await fetchOk(`https://plc.directory/${did}/log`)).json();
+	const ops: PlcOp[] = await (await fetchOk(`https://plc.directory/${did}/log`)).json();
 	if (!ops.length) throw new Error(`empty plc log: ${did}`);
 	return ops;
 }
 
-function pdsFromOp(op: any): string {
+function pdsFromOp(op: PlcOp): string {
 	const url = op?.services?.atproto_pds?.endpoint;
 	if (typeof url !== 'string' || !url.startsWith('https://')) throw new Error('missing pds');
 	return url;
@@ -70,7 +71,7 @@ async function fetchRecordCar(pds: string, did: string, collection: string, rkey
 	let record: Uint8Array | undefined;
 	for await (const { cid, bytes } of car.blocks()) {
 		blocks.set(cid.toString(), bytes);
-		const v: any = dagCbor.decode(bytes);
+		const v = dagCbor.decode(bytes) as { $type?: unknown } | null;
 		if (typeof v?.$type === 'string') record = bytes;
 	}
 	if (!root || !record) throw new Error(`bad record car: ${collection}/${rkey}`);
@@ -99,7 +100,7 @@ export async function fetchProof(
 	// the profile and link proofs are fetched separately and must share one commit
 	for (let attempt = 0; attempt < retries; attempt++) {
 		const profile = await fetchRecordCar(pds, did, 'app.bsky.actor.profile', 'self');
-		const refs: { uri: string; cid: string }[] = (dagCbor.decode(profile.record) as any).links ?? [];
+		const refs = (dagCbor.decode(profile.record) as ProfileRecord).links ?? [];
 		const prefix = `at://${did}/${LINK_COLLECTION}/`;
 		const linkCars = await Promise.all(
 			refs
@@ -109,6 +110,8 @@ export async function fetchProof(
 		);
 		if (linkCars.some((x) => !x.root.equals(profile.root))) continue; // repo changed mid-fetch
 		const commitKey = profile.root.toString();
+		const commit = profile.blocks.get(commitKey);
+		if (!commit) throw new Error('commit block missing from car');
 		const records = new Set([profile.record, ...linkCars.map((x) => x.record)]);
 		const nodes = new Map<string, Uint8Array>();
 		for (const car of [profile, ...linkCars]) {
@@ -120,7 +123,7 @@ export async function fetchProof(
 			did,
 			anchor: await anchorOps,
 			ops,
-			commit: profile.blocks.get(commitKey)!,
+			commit,
 			nodes: [...nodes.values()],
 			profile: profile.record,
 			links: linkCars.map((x) => x.record),

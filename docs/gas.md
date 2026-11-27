@@ -13,12 +13,12 @@ All resolution happens in `eth_call`, so nobody pays this gas. It matters becaus
 
 ## Summary
 
-| | Solar 0.3.1 | solc 0.8.30 (via-IR) |
-|---|---|---|
-| verification (execution) | **884k** | 1,998k |
-| `resolveCallback` for one record (execution) | **898k** | 2,034k |
-| `eth_call` total for one record (+ 21k intrinsic + 63k calldata) | **~0.98M** | ~2.12M |
-| proof size | 4,480 bytes | 4,480 bytes |
+|                                                                  | Solar 0.3.1 | solc 0.8.30 (via-IR) |
+| ---------------------------------------------------------------- | ----------- | -------------------- |
+| verification (execution)                                         | **884k**    | 1,998k               |
+| `resolveCallback` for one record (execution)                     | **898k**    | 2,034k               |
+| `eth_call` total for one record (+ 21k intrinsic + 63k calldata) | **~0.98M**  | ~2.12M               |
+| proof size                                                       | 4,480 bytes | 4,480 bytes          |
 
 Solar is about 2.3× cheaper across the board, and doesn't need via-IR. Earlier figures in this repo
 (~1.8M / ~3.15M) included the test's own cost of ABI-encoding the proof for an external call; the
@@ -26,15 +26,15 @@ numbers here are measured inside the contract.
 
 ## Where verification gas goes (Solar)
 
-| Stage | Gas | Share |
-|---|---|---|
-| anchor PLC chain (bsky.app, 4 ops) | 508,038 | 57% |
-| account PLC chain (1 op) | 126,578 | 14% |
-| identity (handle check + signing key) | 40,605 | 5% |
-| commit (signature + `rev`) | 34,844 | 4% |
-| MST lookup of the profile (1 node) | 40,516 | 5% |
-| profile + links (1 link: CID check, MST lookup, parse) | 133,726 | 15% |
-| **total** | **884,307** | |
+| Stage                                                  | Gas         | Share |
+| ------------------------------------------------------ | ----------- | ----- |
+| anchor PLC chain (bsky.app, 4 ops)                     | 508,038     | 57%   |
+| account PLC chain (1 op)                               | 126,578     | 14%   |
+| identity (handle check + signing key)                  | 40,605      | 5%    |
+| commit (signature + `rev`)                             | 34,844      | 4%    |
+| MST lookup of the profile (1 node)                     | 40,516      | 5%    |
+| profile + links (1 link: CID check, MST lookup, parse) | 133,726     | 15%   |
+| **total**                                              | **884,307** |       |
 
 The PLC chains dominate (71%). Each op verifies a signature against the previous op's rotation keys,
 and every `did:key` has to be base58-decoded and its point decompressed (one `modexp`) to get an
@@ -46,11 +46,11 @@ resolution.
 
 ## Answering records (after verification)
 
-| Record | Gas |
-|---|---|
-| `addr(node)` | 6,888 |
-| `addr(node, 60)` | 7,530 |
-| `text(avatar)` | 1,845 |
+| Record             | Gas   |
+| ------------------ | ----- |
+| `addr(node)`       | 6,888 |
+| `addr(node, 60)`   | 7,530 |
+| `text(avatar)`     | 1,845 |
 | `text(com.github)` | 3,516 |
 
 Records are cheap; verification is everything.
@@ -61,12 +61,12 @@ Records are cheap; verification is everything.
 round trip. `resolveCallback` execution gas (Solar):
 
 | Records (k) | k separate resolutions | one multicall | saving |
-|---|---|---|---|
-| 1 | 897,926 | 900,466 | — |
-| 2 | 1,798,430 | 910,074 | 49% |
-| 4 | 3,592,025 | 917,774 | 74% |
-| 6 | 5,404,511 | 934,853 | 83% |
-| 8 | 7,228,395 | 949,519 | 87% |
+| ----------- | ---------------------- | ------------- | ------ |
+| 1           | 897,926                | 900,466       | —      |
+| 2           | 1,798,430              | 910,074       | 49%    |
+| 4           | 3,592,025              | 917,774       | 74%    |
+| 6           | 5,404,511              | 934,853       | 83%    |
+| 8           | 7,228,395              | 949,519       | 87%    |
 
 Each extra record in a multicall costs roughly 5–10k gas. Separate resolutions also cost k gateway
 round trips and k × (21k intrinsic + ~63k calldata). The ENS UniversalResolver uses the multicall

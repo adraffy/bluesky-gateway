@@ -14,6 +14,7 @@ behavior: it is the spec, including trust assumptions and limitations.
 ```bash
 bun install && forge build
 bunx tsc -p .                          # type check
+bun run lint                           # biome: lint + format check (bun run format to fix)
 forge test                             # Solidity tests (offline, uses test/fixtures)
 bun test                               # TS unit tests + e2e (anvil + gateway + live Bluesky data)
 bun scripts/fixture.ts adraffy.bsky.social   # re-record a live fixture
@@ -21,7 +22,7 @@ bun scripts/serve.ts                   # run the gateway on :8016
 bun scripts/prove.ts adraffy           # fetch + verify a profile, print its ENS records
 ```
 
-Run all three checks (tsc, forge test, bun test) before finishing a change. The e2e test needs network
+Run all four checks (tsc, lint, forge test, bun test) before finishing a change. The e2e test needs network
 access and fails if Bluesky is unreachable or the fixture account changes.
 
 ## Layout
@@ -62,4 +63,5 @@ access and fails if Bluesky is unreachable or the fixture account changes.
 ## Style
 
 - Solidity: `^0.8.28`, compiled with Solar (`solc = "solar:0.3.1"` in foundry.toml; no via-IR needed), custom errors, NatSpec on public surface. It also builds with solc 0.8.30, but only with `via_ir = true` (stack too deep otherwise).
-- TypeScript: ESM, strict, tabs, single quotes, run with bun.
+- TypeScript: ESM, strict, run with bun, formatted and linted by Biome (`biome.json`: tabs, single quotes,
+  120 columns, recommended rules). Type decoded atproto data with `src/atproto.ts` instead of `any`.

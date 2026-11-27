@@ -1,26 +1,29 @@
 {
-  "name": "bluesky-gateway",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "build": "forge build",
-    "test": "bun test && forge test",
-    "fixture": "bun scripts/fixture.ts",
-    "serve": "bun scripts/serve.ts",
-    "prove": "bun scripts/prove.ts"
-  },
-  "dependencies": {
-    "@adraffy/ezccip": "^0.2.0",
-    "@ipld/car": "^6.2.1",
-    "@ipld/dag-cbor": "^11.0.0",
-    "@noble/curves": "^2.4.0",
-    "@noble/hashes": "^2.4.0",
-    "multiformats": "^14.0.8",
-    "viem": "^2.58.8"
-  },
-  "devDependencies": {
-    "@adraffy/blocksmith": "^0.1.60",
-    "@types/bun": "^1.4.5",
-    "typescript": "^7.0.2"
-  }
+	"name": "bluesky-gateway",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "forge build",
+		"test": "bun test && forge test",
+		"fixture": "bun scripts/fixture.ts",
+		"serve": "bun scripts/serve.ts",
+		"prove": "bun scripts/prove.ts",
+		"lint": "biome check .",
+		"format": "biome check --write ."
+	},
+	"dependencies": {
+		"@adraffy/ezccip": "^0.2.0",
+		"@ipld/car": "^6.2.1",
+		"@ipld/dag-cbor": "^11.0.0",
+		"@noble/curves": "^2.4.0",
+		"@noble/hashes": "^2.4.0",
+		"multiformats": "^14.0.8",
+		"viem": "^2.58.8"
+	},
+	"devDependencies": {
+		"@adraffy/blocksmith": "^0.1.60",
+		"@biomejs/biome": "^2.6.9",
+		"@types/bun": "^1.4.5",
+		"typescript": "^7.0.2"
+	}
 }

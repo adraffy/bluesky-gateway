@@ -2,14 +2,15 @@
 // contracts/BlueskyResolver.sol. Useful for debugging fixtures; the contract is authoritative.
 
 import * as dagCbor from '@ipld/dag-cbor';
-import { CID } from 'multiformats/cid';
-import * as Digest from 'multiformats/hashes/digest';
+import { secp256k1 } from '@noble/curves/secp256k1.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { base32 } from 'multiformats/bases/base32';
 import { base58btc } from 'multiformats/bases/base58';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { secp256k1 } from '@noble/curves/secp256k1.js';
-import { PROFILE_KEY, LINK_COLLECTION, HANDLE_SUFFIX, ANCHOR_DID, type Proof } from './bluesky.js';
-import type { Profile, Link } from './records.js';
+import { CID } from 'multiformats/cid';
+import * as Digest from 'multiformats/hashes/digest';
+import type { Commit, LinkRecord, MstNode, PlcOp, ProfileRecord } from './atproto.js';
+import { ANCHOR_DID, HANDLE_SUFFIX, LINK_COLLECTION, PROFILE_KEY, type Proof } from './bluesky.js';
+import type { Link, Profile } from './records.js';
 
 const SECP256K1_PREFIX = [0xe7, 0x01]; // multicodec secp256k1-pub (varint)
 
@@ -25,8 +26,8 @@ function didKeyToPub(didKey: string): Uint8Array {
 }
 
 // DAG-CBOR is canonical, so dropping `sig` and re-encoding yields the signed bytes
-function unsigned(obj: any): Uint8Array {
-	const { sig, ...rest } = obj;
+function unsigned<T extends { sig: unknown }>(obj: T): Uint8Array {
+	const { sig: _, ...rest } = obj;
 	return dagCbor.encode(rest);
 }
 
@@ -41,18 +42,19 @@ function verifySig(msg: Uint8Array, sig: Uint8Array, pubs: Uint8Array[]): boolea
 // verifies an op chain from genesis; returns did, latest op, its rotation keys, and who signed it
 function verifyPlc(encoded: Uint8Array[]) {
 	if (!encoded.length) throw new Error('empty plc chain');
-	const ops = encoded.map((b) => dagCbor.decode(b) as any);
-	const did = 'did:plc:' + base32.baseEncode(sha256(encoded[0])).slice(0, 24);
+	const ops = encoded.map((b) => dagCbor.decode(b) as PlcOp);
+	const did = `did:plc:${base32.baseEncode(sha256(encoded[0])).slice(0, 24)}`;
 	let rotation: Uint8Array[] = ops[0].rotationKeys.map(didKeyToPub); // the genesis op is signed by its own rotation keys
 	let lastSigner: Uint8Array | undefined;
-	ops.forEach((op, i) => {
+	for (const [i, op] of ops.entries()) {
 		if (op.type !== 'plc_operation') throw new Error(`unsupported op type: ${op.type}`);
 		if (i === 0 ? op.prev !== null : op.prev !== cidOf(encoded[i - 1])) throw new Error(`broken prev at op ${i}`);
 		lastSigner = findSigner(unsigned(op), base64url(op.sig), rotation);
 		if (!lastSigner) throw new Error(`bad op sig at ${i}`);
 		if (i > 0) rotation = op.rotationKeys.map(didKeyToPub); // op 0's keys were decoded before the loop
-	});
-	return { did, latest: ops[ops.length - 1], rotation, lastSigner: lastSigner! };
+	}
+	if (!lastSigner) throw new Error('empty plc chain'); // unreachable: ops is non-empty
+	return { did, latest: ops[ops.length - 1], rotation, lastSigner };
 }
 
 const sameKey = (a: Uint8Array, b: Uint8Array) => Buffer.from(a).equals(Buffer.from(b));
@@ -62,7 +64,7 @@ function base64url(s: string): Uint8Array {
 }
 
 // MST lookup: returns the value CID string at `key`, or undefined if provably absent
-function mstGet(rootCid: string, nodes: Map<string, any>, key: string): string | undefined {
+function mstGet(rootCid: string, nodes: Map<string, MstNode>, key: string): string | undefined {
 	const target = new TextEncoder().encode(key);
 	let cid: string | null = rootCid;
 	while (cid) {
@@ -93,7 +95,7 @@ export type Verified = {
 };
 
 function pubToDidKey(pub: Uint8Array): string {
-	return 'did:key:' + base58btc.encode(new Uint8Array([...SECP256K1_PREFIX, ...pub]));
+	return `did:key:${base58btc.encode(new Uint8Array([...SECP256K1_PREFIX, ...pub]))}`;
 }
 
 const TID_ALPHABET = '234567abcdefghijklmnopqrstuvwxyz';
@@ -135,7 +137,7 @@ export function verifyProof(
 	const signingKey = didKeyToPub(latest.verificationMethods.atproto);
 
 	// 3. commit
-	const commit = dagCbor.decode(proof.commit) as any;
+	const commit = dagCbor.decode(proof.commit) as Commit;
 	if (commit.did !== did) throw new Error('commit did mismatch');
 	if (commit.version !== 3) throw new Error('unsupported commit version');
 	const time = Number(tidMicros(commit.rev) / 1_000_000n);
@@ -143,10 +145,10 @@ export function verifyProof(
 	if (!verifySig(unsigned(commit), commit.sig, [signingKey])) throw new Error('bad commit sig');
 
 	// 4. MST + records
-	const nodes = new Map(proof.nodes.map((b) => [cidOf(b), dagCbor.decode(b)]));
+	const nodes = new Map(proof.nodes.map((b) => [cidOf(b), dagCbor.decode(b) as MstNode]));
 	const root = commit.data.toString();
 	if (mstGet(root, nodes, PROFILE_KEY) !== cidOf(proof.profile)) throw new Error('profile not in commit');
-	const profile = dagCbor.decode(proof.profile) as any;
+	const profile = dagCbor.decode(proof.profile) as ProfileRecord;
 
 	const linkBlocks = new Map(proof.links.map((b) => [cidOf(b), b]));
 	const links: Link[] = [];
@@ -156,7 +158,7 @@ export function verifyProof(
 		const prefix = `at://${did}/${LINK_COLLECTION}/`;
 		if (!ref.uri.startsWith(prefix)) continue;
 		if (mstGet(root, nodes, `${LINK_COLLECTION}/${ref.uri.slice(prefix.length)}`) !== ref.cid) continue; // stale ref
-		const link = dagCbor.decode(bytes) as any;
+		const link = dagCbor.decode(bytes) as LinkRecord;
 		links.push({ url: link.url, title: link.title });
 	}
 

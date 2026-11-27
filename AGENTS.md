@@ -42,17 +42,18 @@ access and fails if Bluesky is unreachable or the fixture account changes.
   sides (see the `test_records_*` forge tests and `test/records.test.ts`).
 - **No gateway signer.** The gateway uses ezccip's `raw` protocol. handle → DID is anchored on the
   bsky.app DID's PLC rotation keys. Don't reintroduce a required signature.
-- **No L2 writes.** The resolver stays stateless apart from owner configuration (URLs, parents). Don't
-  add on-chain registries, mirrors or commitments as mitigations.
+- **No L2 writes, no owner.** The resolver is stateless and immutable: all config (gateways, parent,
+  anchor, maxAge) is set in the constructor. Don't add admin setters, on-chain registries, mirrors or
+  commitments.
 - **Bluesky only.** `*.bsky.social` handles, `did:plc`, secp256k1 keys.
 - **Use `@adraffy/ezccip`**, not `@resolverworks/ezccip`.
 - Treat everything the gateway returns as hostile input: bounded parsing, explicit reverts, no
   trust in ordering beyond what hashes and signatures prove.
-- Watch gas: verification is about 3.1M gas in `eth_call`. Avoid per-byte loops over `bytes memory`
+- Watch gas: verification is about 1.8M gas in `eth_call`. Avoid per-byte loops over `bytes memory`
   where fixed-width arithmetic works (see `Secp256k1.didKeyToAddress`).
 - Update `docs/protocol.md` when behavior, trust assumptions or limitations change.
 
 ## Style
 
-- Solidity: `^0.8.28`, compiled with via-IR (stack depth), custom errors, NatSpec on public surface.
+- Solidity: `^0.8.28`, compiled with Solar (`solc = "solar:0.3.1"` in foundry.toml; no via-IR needed), custom errors, NatSpec on public surface. It also builds with solc 0.8.30, but only with `via_ir = true` (stack too deep otherwise).
 - TypeScript: ESM, strict, tabs, single quotes, run with bun.

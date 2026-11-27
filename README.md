@@ -30,6 +30,8 @@ Records (users edit these in the bsky.app profile editor):
 
 ### Commands
 
+Contracts compile with [Solar](https://github.com/paradigmxyz/solar) (`solc = "solar:0.3.1"` in `foundry.toml`).
+
 ```bash
 bun install && forge build
 bun test                               # TS unit + e2e (anvil + gateway + live bsky data)
@@ -40,10 +42,11 @@ bun src/serve.ts                       # gateway on :8016
 
 ### Deploying
 
-`BlueskyResolver(urls, parent, anchorDid, maxAge)`:
+`BlueskyResolver(gateways, parent, anchorDid, maxAge)`. The resolver is immutable (no owner); to
+change any of these, deploy a new one.
 
-- `urls`: gateway endpoints (owner can change)
-- `parent`: namehash of the parent name (owner can add more)
+- `gateways`: CCIP-Read gateway URLs
+- `parent`: namehash of the parent name
 - `anchorDid`: `did:plc:z72i7hdynmk6r22z27h6tvur` (bsky.app); its rotation keys are the trusted PLC
   signers
 - `maxAge`: reject commits older than this many seconds, or 0 for no limit. Bounds stale-record

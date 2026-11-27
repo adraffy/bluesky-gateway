@@ -83,13 +83,26 @@ contract BlueskyResolverTest is Test {
         assertEq(a, vm.parseJsonAddress(json, ".expected.eth"));
     }
 
+    function test_supportsInterface() public view {
+        assertTrue(resolver.supportsInterface(0x01ffc9a7)); // ERC-165
+        assertTrue(resolver.supportsInterface(0x9061b923)); // IExtendedResolver
+        assertFalse(resolver.supportsInterface(0xffffffff));
+    }
+
+    function test_config() public view {
+        assertEq(resolver.parent(), _namehash2("bsky", "eth"));
+        assertEq(resolver.anchorDid(), bytes(vm.parseJsonString(json, ".anchorDid")));
+        assertEq(resolver.maxAge(), MAX_AGE);
+        assertEq(resolver.gateways().length, 1);
+    }
+
     function test_handleFromName() public view {
         assertEq(resolver.handleFromName(NAME), HANDLE);
     }
 
     function test_resolve_revertsOffchainLookup() public {
         bytes memory data = abi.encodeWithSelector(BlueskyRecords.ADDR, bytes32(0));
-        string[] memory urls = resolver.gatewayURLs();
+        string[] memory urls = resolver.gateways();
         vm.expectRevert(
             abi.encodeWithSelector(
                 BlueskyResolver.OffchainLookup.selector,

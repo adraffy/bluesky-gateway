@@ -4,6 +4,10 @@ pragma solidity ^0.8.28;
 import {BlueskyVerifier} from "./BlueskyVerifier.sol";
 import {BlueskyRecords} from "./BlueskyRecords.sol";
 
+interface IERC165 {
+    function supportsInterface(bytes4 interfaceId) external view returns (bool);
+}
+
 interface IExtendedResolver {
     function resolve(bytes calldata name, bytes calldata data) external view returns (bytes memory);
 }
@@ -26,62 +30,42 @@ interface IBlueskyGateway {
 /// @notice ENSIP-10 wildcard resolver: {label}.<parent> => {label}.bsky.social
 /// Records are proven from the account's signed atproto repo. The gateway is untrusted: handle -> did
 /// is accepted when the account's latest PLC op claims the handle and was signed by one of the
-/// anchor DID's rotation keys (Bluesky's PLC signers).
-contract BlueskyResolver is IExtendedResolver {
+/// anchor DID's rotation keys (Bluesky's PLC signers). Immutable: no owner, all config is set at deployment.
+contract BlueskyResolver is IERC165, IExtendedResolver {
     error OffchainLookup(address sender, string[] urls, bytes callData, bytes4 callbackFunction, bytes extraData);
     error UnsupportedName(bytes name);
-    error Unauthorized();
-
-    event GatewayChanged(string[] urls);
-    event ParentChanged(bytes32 node, bool enabled);
 
     bytes constant HANDLE_SUFFIX = ".bsky.social";
 
-    address public owner;
-    bytes public anchorDid;
+    bytes32 public immutable parent;
     uint256 public immutable maxAge;
-    string[] _urls;
-    mapping(bytes32 => bool) public parents;
+    bytes public anchorDid;
+    string[] _gateways;
 
-    /// @param anchor DID whose latest rotation keys are trusted to sign PLC ops (bsky.app: did:plc:z72i7hdynmk6r22z27h6tvur)
-    /// @param _maxAge reject commits older than this many seconds (0 = no limit). Accounts that haven't
+    /// @param gateways_ CCIP-Read gateway URLs
+    /// @param parent_ namehash of the parent name: {label}.<parent> resolves
+    /// @param anchorDid_ DID whose latest rotation keys are trusted to sign PLC ops (bsky.app: did:plc:z72i7hdynmk6r22z27h6tvur)
+    /// @param maxAge_ reject commits older than this many seconds (0 = no limit). Accounts that haven't
     /// written to their repo (post, like, follow, profile edit) within this window stop resolving.
-    constructor(string[] memory urls, bytes32 parent, bytes memory anchor, uint256 _maxAge) {
-        owner = msg.sender;
-        _urls = urls;
-        parents[parent] = true;
-        anchorDid = anchor;
-        maxAge = _maxAge;
+    constructor(string[] memory gateways_, bytes32 parent_, bytes memory anchorDid_, uint256 maxAge_) {
+        _gateways = gateways_;
+        parent = parent_;
+        anchorDid = anchorDid_;
+        maxAge = maxAge_;
     }
 
-    modifier onlyOwner() {
-        if (msg.sender != owner) revert Unauthorized();
-        _;
-    }
-
-    function setGateway(string[] calldata urls) external onlyOwner {
-        _urls = urls;
-        emit GatewayChanged(urls);
-    }
-
-    function setParent(bytes32 node, bool enabled) external onlyOwner {
-        parents[node] = enabled;
-        emit ParentChanged(node, enabled);
-    }
-
-    function gatewayURLs() external view returns (string[] memory) {
-        return _urls;
+    function gateways() external view returns (string[] memory) {
+        return _gateways;
     }
 
     function supportsInterface(bytes4 x) external pure returns (bool) {
-        return x == 0x01ffc9a7 // ERC-165
-            || x == 0x9061b923; // IExtendedResolver
+        return x == type(IERC165).interfaceId || x == type(IExtendedResolver).interfaceId;
     }
 
     /// @notice "{label}.<parent>" -> "{label}.bsky.social"
     function handleFromName(bytes memory name) public view returns (bytes memory handle) {
         uint256 len = uint8(name[0]);
-        if (len == 0 || len > 63 || !parents[_namehash(name, 1 + len)]) revert UnsupportedName(name);
+        if (len == 0 || len > 63 || _namehash(name, 1 + len) != parent) revert UnsupportedName(name);
         handle = new bytes(len);
         for (uint256 i; i < len; i++) {
             bytes1 c = name[1 + i];
@@ -96,7 +80,7 @@ contract BlueskyResolver is IExtendedResolver {
         bytes memory handle = handleFromName(name);
         revert OffchainLookup(
             address(this),
-            _urls,
+            _gateways,
             abi.encodeCall(IBlueskyGateway.proveProfile, (string(handle))),
             this.resolveCallback.selector,
             abi.encode(handle, data)

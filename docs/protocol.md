@@ -17,8 +17,8 @@ ENS client ──► BlueskyResolver.resolveCallback(response)
 
 `{label}.<parent>` maps to the handle `{label}.bsky.social`.
 
-- `<parent>` is any name the owner enabled with `setParent(namehash, true)`; one resolver can serve
-  several parents.
+- `<parent>` is the single parent name set at deployment (`parent` is its namehash). Deploy another
+  resolver for another parent.
 - The handle is derived from the queried name **in the contract**, never taken from the gateway.
 - `label` must be 1–63 chars of `[a-z0-9-]`, not starting or ending with `-`. Anything else, the
   parent itself, and names more than one label below a parent revert `UnsupportedName`.
@@ -51,7 +51,7 @@ Links are considered in profile display order. The mapping lives in
 ```solidity
 OffchainLookup(
   sender:   resolver,
-  urls:     gatewayURLs(),
+  urls:     gateways(),
   callData: proveProfile(string handle),
   callback: resolveCallback.selector,
   extra:    abi.encode(bytes handle, bytes data)
@@ -111,14 +111,14 @@ genesis op's own keys for the genesis op). Its DID is `"did:plc:" + base32(sha25
 8. **Records:** answered from the verified profile and links (§2).
 
 Signed objects are canonical DAG-CBOR, so the unsigned bytes are rebuilt on-chain by removing the
-`sig` entry from the top-level map. Verification costs about 3.1M gas, inside `eth_call`.
+`sig` entry from the top-level map. Verification costs about 1.8M gas, inside `eth_call` (compiled with Solar; about 3.15M with solc via-IR).
 
 ## 5. Trust assumptions
 
 There is no gateway signer. The trust root is the **anchor DID** (bsky.app): its rotation keys are
 taken to be the keys Bluesky uses to sign bsky.social identity operations. That's an assumption about
-how Bluesky operates, observed but not guaranteed (see Appendix). The anchor and `maxAge` are fixed
-at deployment.
+how Bluesky operates, observed but not guaranteed (see Appendix). The resolver is immutable: gateway
+URLs, parent, anchor and `maxAge` are fixed at deployment, and there is no owner.
 
 | Party | Trusted for | Can | Cannot |
 |---|---|---|---|
@@ -126,7 +126,7 @@ at deployment.
 | **Gateway** (anyone serving responses) | availability only | withhold responses; serve **older valid data** (see below) | point a name at a DID unless a Bluesky key signed an op giving that DID the handle; alter records |
 | **PLC directory** | serving op logs | withhold or censor ops | forge ops (they're signed) |
 | **Account holder** (and anyone with their password, app password, or an app allowed to edit the profile) | the records | change any record | — |
-| **Resolver owner** | configuration | replace gateway URLs and parents | change the anchor or `maxAge`; alter records |
+| **Deployer** | configuration, once | choose gateway URLs, parent, anchor and `maxAge` at deployment | change anything afterwards (there is no owner) |
 
 **Freshness is not verified.** Every piece of the proof is a valid prefix or snapshot, and nothing
 on-chain says it's the latest, so any gateway can serve older data that still verifies:
@@ -163,7 +163,7 @@ resolving (from an honest gateway). If someone else later takes the handle, the 
   other coins, no pinned-post records.
 - Every query is a separate CCIP-Read round trip; there's no multicall batching.
 - `text(avatar)` depends on Bluesky's CDN URL format.
-- About 3.1M gas per resolution; fine for `eth_call`, but RPC providers that cap `eth_call` gas
+- About 1.8M gas per resolution; fine for `eth_call`, but RPC providers that cap `eth_call` gas
   lower would fail.
 - The end-to-end test uses live Bluesky data and fails if it's unreachable or the profile changes.
 
@@ -178,7 +178,7 @@ resolving (from an honest gateway). If someone else later takes the handle, the 
 - P-256 keys via the EIP-7951 precompile; multicall support.
 
 Out of scope by decision: anything that requires writes to an L2 (registries, PLC mirrors,
-monotonic commitments). The resolver stays stateless apart from owner configuration.
+monotonic commitments). The resolver is stateless and immutable.
 
 ## Appendix: observed data
 

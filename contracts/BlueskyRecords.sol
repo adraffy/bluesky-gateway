@@ -14,7 +14,11 @@ library BlueskyRecords {
     bytes4 constant MULTICALL = 0xac9650d8; // multicall(bytes[])
 
     uint256 constant COIN_ETH = 60;
-    uint256 constant COIN_DEFAULT_EVM = 0x80000000;
+    uint256 constant COIN_DEFAULT_EVM = 0x80000000; // ENSIP-19 default EVM address
+    uint256 constant COIN_BASE = 0x80000000 | 8453; // ENSIP-11: 0x80000000 | chainId
+    uint256 constant COIN_ARBITRUM = 0x80000000 | 42161;
+
+    bytes constant DEFAULT_SUFFIX = "?default";
 
     bytes constant AVATAR_CDN = "https://cdn.bsky.app/img/avatar/plain/";
 
@@ -44,12 +48,11 @@ library BlueskyRecords {
     function _answer(BlueskyVerifier.Profile memory p, bytes memory data) private pure returns (bool, bytes memory) {
         bytes4 selector = bytes4(data);
         if (selector == ADDR && data.length >= 36) {
-            (bool ok, address a) = ethAddress(p);
+            (bool ok, address a) = addr(p, COIN_ETH);
             return (true, abi.encode(ok ? a : address(0)));
         } else if (selector == ADDR_COIN && data.length >= 68) {
             (, uint256 coinType) = abi.decode(_args(data), (bytes32, uint256));
-            if (coinType != COIN_ETH && coinType != COIN_DEFAULT_EVM) return (true, abi.encode(bytes("")));
-            (bool ok, address a) = ethAddress(p);
+            (bool ok, address a) = addr(p, coinType);
             return (true, abi.encode(ok ? abi.encodePacked(a) : bytes("")));
         } else if (selector == TEXT && data.length >= 100) {
             (, string memory key) = abi.decode(_args(data), (bytes32, string));
@@ -72,37 +75,48 @@ library BlueskyRecords {
 
     // addr
 
-    /// @notice first link titled "eth" ending in "/0x<40 hex>", else "eth:0x<40 hex>" in the bio
-    function ethAddress(BlueskyVerifier.Profile memory p) internal pure returns (bool, address) {
+    struct Explorer {
+        bytes prefix;
+        uint256 coinType;
+    }
+
+    /// @notice block explorers whose address pages map to a coin type
+    function _explorers() private pure returns (Explorer[3] memory) {
+        return [
+            Explorer("https://etherscan.io/address/", COIN_ETH),
+            Explorer("https://basescan.org/address/", COIN_BASE),
+            Explorer("https://arbiscan.io/address/", COIN_ARBITRUM)
+        ];
+    }
+
+    /// @notice address for `coinType` from the first matching explorer link, in profile order.
+    /// `COIN_DEFAULT_EVM` comes only from a link marked `?default`; there is no fallback between coin types.
+    function addr(BlueskyVerifier.Profile memory p, uint256 coinType) internal pure returns (bool, address) {
         for (uint256 i; i < p.links.length; i++) {
-            (bool ok, address a) = _linkAddr(p.links[i]);
-            if (ok) return (true, a);
-        }
-        return _bioAddr(p.description);
-    }
-
-    function _linkAddr(BlueskyVerifier.Link memory link) private pure returns (bool, address) {
-        bytes memory url = link.url;
-        if (keccak256(link.title) != keccak256("eth") || url.length <= 42 || url[url.length - 43] != "/") {
-            return (false, address(0));
-        }
-        return _parseAddr(url, url.length - 42);
-    }
-
-    function _bioAddr(bytes memory bio) private pure returns (bool, address) {
-        bytes memory tag = "eth:";
-        for (uint256 i; i + 46 <= bio.length; i++) {
-            if (i > 0 && !_isSpace(bio[i - 1])) continue;
-            if (!CBOR.eqAt(bio, i, 4, tag)) continue;
-            if (i + 46 < bio.length && !_isSpace(bio[i + 46])) continue;
-            (bool ok, address a) = _parseAddr(bio, i + 4);
-            if (ok) return (true, a);
+            (bool ok, uint256 linkCoin, bool isDefault, address a) = _addressLink(p.links[i].url);
+            if (ok && (coinType == COIN_DEFAULT_EVM ? isDefault : linkCoin == coinType)) return (true, a);
         }
         return (false, address(0));
     }
 
-    function _isSpace(bytes1 c) private pure returns (bool) {
-        return c == " " || c == "\t" || c == "\r" || c == "\n";
+    /// @notice parses "{explorer}/address/0x<40 hex>" with an optional "?default" suffix
+    /// @return ok, the explorer's coin type, whether it's marked default, and the address
+    function _addressLink(bytes memory url) private pure returns (bool, uint256, bool, address) {
+        Explorer[3] memory explorers = _explorers();
+        for (uint256 i; i < explorers.length; i++) {
+            bytes memory prefix = explorers[i].prefix;
+            if (url.length < prefix.length + 42 || !CBOR.eqAt(url, 0, prefix.length, prefix)) continue;
+            uint256 rest = url.length - prefix.length;
+            bool isDefault;
+            if (rest == 42 + DEFAULT_SUFFIX.length && CBOR.eqAt(url, prefix.length + 42, DEFAULT_SUFFIX.length, DEFAULT_SUFFIX)) {
+                isDefault = true;
+            } else if (rest != 42) {
+                continue;
+            }
+            (bool ok, address a) = _parseAddr(url, prefix.length);
+            if (ok) return (true, explorers[i].coinType, isDefault, a);
+        }
+        return (false, 0, false, address(0));
     }
 
     /// @notice parses "0x" + 40 hex at `p`
@@ -145,7 +159,7 @@ library BlueskyRecords {
         }
         if (k == keccak256("url")) {
             for (uint256 i; i < p.links.length; i++) {
-                (bool isAddr,) = _linkAddr(p.links[i]);
+                (bool isAddr,,,) = _addressLink(p.links[i].url);
                 (bool isSocial,,) = _social(p.links[i].url);
                 if (!isAddr && !isSocial) return p.links[i].url;
             }

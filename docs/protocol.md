@@ -25,20 +25,39 @@ ENS client ──► BlueskyResolver.resolveCallback(response)
 
 ## 2. Records
 
-Users set these in the bsky.app profile editor (links require pressing Save).
+Users set these in the bsky.app profile editor (links require pressing Save). To set an address,
+add a profile link to its block explorer page.
 
-| ENS query                                                | Source                                                                                                                                                                                           |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `addr(node)`, `addr(node, 60)`, `addr(node, 0x80000000)` | first profile link titled exactly `eth` whose URL ends in `/0x` + 40 hex (e.g. `https://etherscan.io/address/0x…`); otherwise an `eth:0x…` token in the bio delimited by whitespace or start/end |
-| `addr(node, other)`                                      | empty                                                                                                                                                                                            |
-| `text(name)`                                             | `displayName`                                                                                                                                                                                    |
-| `text(description)`                                      | `description` (bio)                                                                                                                                                                              |
-| `text(avatar)`                                           | `https://cdn.bsky.app/img/avatar/plain/{did}/{avatarCid}@jpeg`                                                                                                                                   |
-| `text(com.github)`                                       | first path segment of the first link to `https://github.com/…`                                                                                                                                   |
-| `text(com.twitter)`                                      | first path segment of the first link to `https://x.com/…` or `https://twitter.com/…`                                                                                                             |
-| `text(url)`                                              | first link that is neither an `eth` link nor one of the above                                                                                                                                    |
-| other `text` keys                                        | empty                                                                                                                                                                                            |
-| other selectors                                          | revert `UnsupportedResolverProfile`                                                                                                                                                              |
+| ENS query                               | Source                                                                                   |
+| --------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `addr(node)`, `addr(node, 60)`          | first link to `https://etherscan.io/address/0x…`                                         |
+| `addr(node, 0x80002105)` (Base)         | first link to `https://basescan.org/address/0x…`                                         |
+| `addr(node, 0x8000a4b1)` (Arbitrum One) | first link to `https://arbiscan.io/address/0x…`                                          |
+| `addr(node, 0x80000000)` (default EVM)  | first explorer link ending in `?default`, eg. `https://etherscan.io/address/0x…?default` |
+| `addr(node, other)`                     | empty                                                                                    |
+| `text(name)`                            | `displayName`                                                                            |
+| `text(description)`                     | `description` (bio)                                                                      |
+| `text(avatar)`                          | `https://cdn.bsky.app/img/avatar/plain/{did}/{avatarCid}@jpeg`                           |
+| `text(com.github)`                      | first path segment of the first link to `https://github.com/…`                           |
+| `text(com.twitter)`                     | first path segment of the first link to `https://x.com/…` or `https://twitter.com/…`     |
+| `text(url)`                             | first link that is neither an explorer address link nor one of the above                 |
+| other `text` keys                       | empty                                                                                    |
+| other selectors                         | revert `UnsupportedResolverProfile`                                                      |
+
+### Addresses and links
+
+Address links must be exactly `https://{explorer}/address/0x` + 40 hex digits, optionally followed by
+`?default` (no trailing slash, no other query, no subdomains or testnets). The link's title is
+ignored: the explorer's host picks the coin type. The bio is not parsed.
+
+The default EVM address ([ENSIP-19](https://docs.ens.domains/ensip/19)) is opt-in: only a link
+marked `?default` provides it, and that link still counts for its own chain. The resolver never falls
+back between coin types; clients fall back from a chain to the default themselves. Without `?default`,
+a mainnet-only contract wallet (eg. a Safe) would otherwise be advertised on every EVM chain.
+
+Links are considered in profile display order. The mapping lives in
+[`BlueskyRecords.sol`](../contracts/BlueskyRecords.sol) and is mirrored in
+[`records.ts`](../src/records.ts); tests check both against the same cases.
 
 ### Multicall
 
@@ -51,10 +70,6 @@ The resolver advertises this via [ERC-7996](https://eips.ethereum.org/EIPS/eip-7
 `supportsInterface(0x582de3e7)` and `supportsFeature(0x96b62db8)` (ENS
 `ResolverFeatures.RESOLVE_MULTICALL`, `keccak256("eth.ens.resolver.extended.multicall")`), which is
 what the ENS UniversalResolver checks before sending `resolve(name, multicall(...))` directly.
-
-Links are considered in profile display order. The mapping lives in
-[`BlueskyRecords.sol`](../contracts/BlueskyRecords.sol) and is mirrored in
-[`records.ts`](../src/records.ts); tests check both against the same cases.
 
 ## 3. Request and response
 
@@ -172,8 +187,8 @@ resolving (from an honest gateway). If someone else later takes the handle, the 
   retired Bluesky key.
 - If Bluesky stops signing user ops with the same keys bsky.app lists, resolution breaks until the
   resolver is redeployed with a new anchor.
-- Only an ETH address (coin types 60 and 0x80000000) and the text keys in §2. No contenthash, no
-  other coins, no pinned-post records.
+- Only Ethereum, Base and Arbitrum One addresses (plus the default EVM address) and the text keys in
+  §2. No contenthash, no other coins, no pinned-post records.
 - `text(avatar)` depends on Bluesky's CDN URL format.
 - About 1.0M gas per `eth_call` (0.9M execution + calldata + intrinsic; [gas.md](gas.md)); fine,
   but RPC providers that cap `eth_call` gas
@@ -186,7 +201,8 @@ resolving (from an honest gateway). If someone else later takes the handle, the 
   signers, without making it required.
 - **DID-keyed names** (`<did-suffix>.plc.<parent>`): no dependence on Bluesky vouching for handles.
 - **Custom-domain handles with DNSSEC:** prove `_atproto.<handle>` TXT via ENS's DNSSEC oracle.
-- **More records:** other coins via link titles (`btc`, `sol`, …), pinned-post overflow, or a custom
+- **More records:** more chains via their explorers (Optimism, Polygon, …), non-EVM coins,
+  pinned-post overflow, or a custom
   `domains.ens.*` collection written through atproto OAuth.
 - P-256 keys via the EIP-7951 precompile.
 - Gas: see the optimizations listed in [gas.md](gas.md).

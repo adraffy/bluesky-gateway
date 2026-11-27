@@ -1,7 +1,7 @@
 # bluesky-gateway
 
 ENS resolver + CCIP-Read gateway that proves records from Bluesky profiles. Protocol, trust
-assumptions and limitations: [docs/protocol.md](docs/protocol.md).
+assumptions and limitations: [docs/protocol.md](docs/protocol.md). Gas: [docs/gas.md](docs/gas.md).
 
 ## How it works
 
@@ -19,6 +19,9 @@ Records (users edit these in the bsky.app profile editor):
 | `text(avatar)` | avatar blob → `cdn.bsky.app` URL |
 | `text(com.github)`, `text(com.twitter)` | profile links to github.com / x.com / twitter.com |
 | `text(url)` | first other profile link |
+
+All of these can be requested together with `resolve(name, multicall([...]))` (ERC-7996 feature
+`eth.ens.resolver.extended.multicall`): one gateway round trip, one verification.
 
 ### Layout
 

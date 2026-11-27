@@ -16,7 +16,7 @@ const NAME = 'adraffy.bsky.eth';
 let foundry: Foundry;
 let ccip: Awaited<ReturnType<typeof serveEZCCIP>>;
 let resolver: any;
-let expected: { eth?: string; avatar?: string; description?: string };
+let expected: { eth?: string; avatar?: string; description?: string; github?: string };
 
 beforeAll(async () => {
 	const v = verifyProof(HANDLE, await fetchProof(HANDLE));
@@ -24,6 +24,7 @@ beforeAll(async () => {
 		eth: addr(v.profile, COIN_ETH),
 		avatar: text(v.profile, v.did, 'avatar'),
 		description: text(v.profile, v.did, 'description'),
+		github: text(v.profile, v.did, 'com.github'),
 	};
 	foundry = await Foundry.launch({ infoLog: false });
 	ccip = await serveEZCCIP(createGateway(), { log: false });
@@ -45,7 +46,8 @@ test('resolve() via CCIP-Read', async () => {
 	expect(await ens.getAddress()).toBe(expected.eth!);
 	expect(await ens.getText('avatar')).toBe(expected.avatar ?? '');
 	expect(await ens.getText('description')).toBe(expected.description ?? '');
-	expect(await ens.getText('com.github')).toBe('');
+	expect(await ens.getText('com.github')).toBe(expected.github ?? '');
+	expect(await ens.getText('not-a-key')).toBe('');
 }, 60_000);
 
 test('resolve(name, multicall([...])) in one CCIP-Read round trip', async () => {

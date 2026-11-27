@@ -78,7 +78,7 @@ contract BlueskyResolverTest is Test {
         assertEq(string(p.did), vm.parseJsonString(json, ".did"));
         assertEq(p.time, vm.parseJsonUint(json, ".expected.time")); // TS and Solidity TID decoding agree
         assertEq(p.links.length, 1);
-        (bool ok, address a) = BlueskyRecords.ethAddress(p);
+        (bool ok, address a) = BlueskyRecords.addr(p, BlueskyRecords.COIN_ETH);
         assertTrue(ok);
         assertEq(a, vm.parseJsonAddress(json, ".expected.eth"));
     }
@@ -314,42 +314,131 @@ contract BlueskyResolverTest is Test {
 
     // mirrors test/records.test.ts
 
-    function _profile(bytes memory bio, BlueskyVerifier.Link[] memory links)
-        internal
-        pure
-        returns (BlueskyVerifier.Profile memory p)
-    {
+    address constant A = 0x51050ec063d393217B436747617aD1C2285Aeeee;
+    address constant B = 0x000000000000000000000000000000000000dEaD;
+    address constant C = 0x00000000000000000000000000000000000000cc;
+
+    function _links(string[] memory urls) internal pure returns (BlueskyVerifier.Profile memory p) {
         p.did = "did:plc:x";
-        p.description = bio;
-        p.links = links;
+        p.links = new BlueskyVerifier.Link[](urls.length);
+        for (uint256 i; i < urls.length; i++) {
+            p.links[i] = BlueskyVerifier.Link(bytes(urls[i]), "");
+        }
     }
 
-    function _addr(BlueskyVerifier.Profile memory p) internal pure returns (address a) {
-        (, a) = BlueskyRecords.ethAddress(p);
+    function _one(string memory url) internal pure returns (BlueskyVerifier.Profile memory) {
+        string[] memory urls = new string[](1);
+        urls[0] = url;
+        return _links(urls);
     }
 
-    function test_records_bio() public pure {
-        address A = 0x51050ec063d393217B436747617aD1C2285Aeeee;
-        BlueskyVerifier.Link[] memory none;
-        assertEq(_addr(_profile("hi eth:0x51050ec063d393217B436747617aD1C2285Aeeee\nbye", none)), A);
-        assertEq(_addr(_profile("xeth:0x51050ec063d393217B436747617aD1C2285Aeeee", none)), address(0));
-        assertEq(_addr(_profile("eth:0x51050ec063d393217B436747617aD1C2285Aeeeex", none)), address(0));
+    function _addr(BlueskyVerifier.Profile memory p, uint256 coinType) internal pure returns (address a) {
+        (, a) = BlueskyRecords.addr(p, coinType);
     }
 
-    function test_records_links() public pure {
-        address A = 0x51050ec063d393217B436747617aD1C2285Aeeee;
-        BlueskyVerifier.Link[] memory links = new BlueskyVerifier.Link[](4);
-        links[0] = BlueskyVerifier.Link("https://etherscan.io/address/0x51050ec063d393217B436747617aD1C2285Aeeee", "eth");
-        links[1] = BlueskyVerifier.Link("https://github.com/adraffy/ens-normalize.js", "");
-        links[2] = BlueskyVerifier.Link("https://x.com/adraffy?s=1", "");
-        links[3] = BlueskyVerifier.Link("https://raffy.xyz", "");
-        BlueskyVerifier.Profile memory p = _profile("eth:0x000000000000000000000000000000000000dEaD", links);
-        assertEq(_addr(p), A);
+    uint256 constant COIN_OPTIMISM = 0x80000000 | 10; // no explorer support: only reachable via #default
+    uint256 constant COIN_BTC = 0;
+
+    function test_records_chainFromCoinType() public pure {
+        assertEq(BlueskyRecords.chainFromCoinType(BlueskyRecords.COIN_ETH), 1);
+        assertEq(BlueskyRecords.chainFromCoinType(BlueskyRecords.COIN_BASE), 8453);
+        assertEq(BlueskyRecords.chainFromCoinType(COIN_OPTIMISM), 10);
+        assertEq(BlueskyRecords.chainFromCoinType(BlueskyRecords.COIN_DEFAULT_EVM), 0);
+        assertEq(BlueskyRecords.chainFromCoinType(COIN_BTC), 0);
+        assertEq(BlueskyRecords.chainFromCoinType(0x100000000), 0);
+    }
+
+    function test_records_explorers() public pure {
+        string[] memory urls = new string[](3);
+        urls[0] = "https://etherscan.io/address/0x51050ec063d393217B436747617aD1C2285Aeeee";
+        urls[1] = "https://basescan.org/address/0x000000000000000000000000000000000000dEaD";
+        urls[2] = "https://arbiscan.io/address/0x00000000000000000000000000000000000000cc";
+        BlueskyVerifier.Profile memory p = _links(urls);
+        assertEq(_addr(p, BlueskyRecords.COIN_ETH), A);
+        assertEq(_addr(p, BlueskyRecords.COIN_BASE), B);
+        assertEq(_addr(p, BlueskyRecords.COIN_ARBITRUM), C);
+        assertEq(_addr(p, COIN_OPTIMISM), address(0)); // no #default
+        assertEq(_addr(p, BlueskyRecords.COIN_DEFAULT_EVM), address(0));
+        assertEq(BlueskyRecords.COIN_BASE, 0x80002105);
+        assertEq(BlueskyRecords.COIN_ARBITRUM, 0x8000a4b1);
+        p.links[0].title = "whatever"; // title is ignored
+        assertEq(_addr(p, BlueskyRecords.COIN_ETH), A);
+    }
+
+    function test_records_default() public pure {
+        string[] memory urls = new string[](2);
+        urls[0] = "https://etherscan.io/address/0x51050ec063d393217B436747617aD1C2285Aeeee#default";
+        urls[1] = "https://basescan.org/address/0x000000000000000000000000000000000000dEaD";
+        BlueskyVerifier.Profile memory p = _links(urls);
+        assertEq(_addr(p, BlueskyRecords.COIN_DEFAULT_EVM), A);
+        assertEq(_addr(p, BlueskyRecords.COIN_ETH), A); // its own chain
+        assertEq(_addr(p, BlueskyRecords.COIN_BASE), B); // chain-specific link wins over the default
+        assertEq(_addr(p, BlueskyRecords.COIN_ARBITRUM), A); // known chain without a link: default
+        assertEq(_addr(p, COIN_OPTIMISM), A); // unknown EVM chain: default
+        assertEq(_addr(p, COIN_BTC), address(0)); // non-EVM: no default
+        // any explorer can carry it; mainnet falls back too
+        BlueskyVerifier.Profile memory q = _one("https://basescan.org/address/0x000000000000000000000000000000000000dEaD#default");
+        assertEq(_addr(q, BlueskyRecords.COIN_DEFAULT_EVM), B);
+        assertEq(_addr(q, BlueskyRecords.COIN_ETH), B);
+    }
+
+    function test_records_firstWins() public pure {
+        string[] memory urls = new string[](2);
+        urls[0] = "https://etherscan.io/address/0x51050ec063d393217B436747617aD1C2285Aeeee";
+        urls[1] = "https://etherscan.io/address/0x000000000000000000000000000000000000dEaD";
+        assertEq(_addr(_links(urls), BlueskyRecords.COIN_ETH), A);
+        urls[0] = "https://basescan.org/address/0x000000000000000000000000000000000000dEaD#default";
+        urls[1] = "https://etherscan.io/address/0x51050ec063d393217B436747617aD1C2285Aeeee#default";
+        BlueskyVerifier.Profile memory p = _links(urls);
+        assertEq(_addr(p, BlueskyRecords.COIN_DEFAULT_EVM), B);
+        assertEq(_addr(p, BlueskyRecords.COIN_ETH), A); // chain-specific still wins
+    }
+
+    function test_records_strictFormat() public pure {
+        string[11] memory bad = [
+            "https://etherscan.io/address/0x51050ec063d393217B436747617aD1C2285Aeeee/",
+            "https://etherscan.io/address/0x51050ec063d393217B436747617aD1C2285Aeeee?a=1",
+            "https://etherscan.io/address/0x51050ec063d393217B436747617aD1C2285Aeeee?default",
+            "https://etherscan.io/address/0x51050ec063d393217B436747617aD1C2285Aeeee#defaultx",
+            "https://etherscan.io/address/0x51050ec063d393217B436747617aD1C2285Aeeee#",
+            "https://etherscan.io/address/0x51050ec063d393217B436747617aD1C2285Aeee",
+            "https://etherscan.io/token/0x51050ec063d393217B436747617aD1C2285Aeeee",
+            "http://etherscan.io/address/0x51050ec063d393217B436747617aD1C2285Aeeee",
+            "https://sepolia.etherscan.io/address/0x51050ec063d393217B436747617aD1C2285Aeeee",
+            "https://basescan.io/address/0x51050ec063d393217B436747617aD1C2285Aeeee",
+            "https://x.io/0x51050ec063d393217B436747617aD1C2285Aeeee"
+        ];
+        for (uint256 i; i < bad.length; i++) {
+            assertEq(_addr(_one(bad[i]), BlueskyRecords.COIN_ETH), address(0));
+            assertEq(_addr(_one(bad[i]), BlueskyRecords.COIN_DEFAULT_EVM), address(0));
+        }
+    }
+
+    function test_records_bioNotParsed() public pure {
+        BlueskyVerifier.Profile memory p;
+        p.description = "eth:0x51050ec063d393217B436747617aD1C2285Aeeee";
+        assertEq(_addr(p, BlueskyRecords.COIN_ETH), address(0));
+    }
+
+    function test_records_text() public pure {
+        string[] memory urls = new string[](5);
+        urls[0] = "https://etherscan.io/address/0x51050ec063d393217B436747617aD1C2285Aeeee";
+        urls[1] = "https://basescan.org/address/0x000000000000000000000000000000000000dEaD#default";
+        urls[2] = "https://github.com/adraffy/ens-normalize.js";
+        urls[3] = "https://x.com/adraffy?s=1";
+        urls[4] = "https://raffy.xyz";
+        BlueskyVerifier.Profile memory p = _links(urls);
         assertEq(string(BlueskyRecords.text(p, "com.github")), "adraffy");
         assertEq(string(BlueskyRecords.text(p, "com.twitter")), "adraffy");
         assertEq(string(BlueskyRecords.text(p, "url")), "https://raffy.xyz");
-        links[0].title = "ETH";
-        assertEq(_addr(p), 0x000000000000000000000000000000000000dEaD);
+    }
+
+    function test_addrCoin_chains() public view {
+        // live fixture: only an etherscan link, no #default, so no fallback either
+        bytes memory res = _callback(abi.encodeWithSelector(BlueskyRecords.ADDR_COIN, bytes32(0), BlueskyRecords.COIN_DEFAULT_EVM));
+        assertEq(abi.decode(res, (bytes)), "");
+        res = _callback(abi.encodeWithSelector(BlueskyRecords.ADDR_COIN, bytes32(0), BlueskyRecords.COIN_BASE));
+        assertEq(abi.decode(res, (bytes)), "");
     }
 
     function test_ignoresTamperedLink() public view {

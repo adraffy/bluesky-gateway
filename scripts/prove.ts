@@ -10,7 +10,7 @@ import { bytesToHex, encodeFunctionResult, parseAbi } from 'viem';
 import { errorMessage } from '../src/atproto.js';
 import { ANCHOR_DID, fetchProof, normalizeHandle, type Proof } from '../src/bluesky.js';
 import { PROVE_PROFILE } from '../src/gateway.js';
-import { addr, COIN_ETH, text } from '../src/records.js';
+import { addr, COIN_ARBITRUM, COIN_BASE, COIN_DEFAULT_EVM, COIN_ETH, text } from '../src/records.js';
 import { type Verified, verifyProof } from '../src/verify.js';
 
 const TEXT_KEYS = ['name', 'description', 'avatar', 'url', 'com.github', 'com.twitter'];
@@ -45,7 +45,13 @@ function encodeResponse(p: Proof): `0x${string}` {
 }
 
 function records(v: Verified) {
-	const out: Record<string, string | null> = { 'addr(60)': addr(v.profile, COIN_ETH) ?? null };
+	const out: Record<string, string | null> = {
+		'addr(eth)': addr(v.profile, COIN_ETH) ?? null,
+		'addr(base)': addr(v.profile, COIN_BASE) ?? null,
+		'addr(arb1)': addr(v.profile, COIN_ARBITRUM) ?? null,
+		'addr(op)': addr(v.profile, 0x80000000n | 10n) ?? null, // no explorer support: #default fallback only
+		'addr(default)': addr(v.profile, COIN_DEFAULT_EVM) ?? null,
+	};
 	for (const key of TEXT_KEYS) out[key] = text(v.profile, v.did, key) ?? null;
 	return out;
 }

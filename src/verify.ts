@@ -83,7 +83,18 @@ function mstGet(rootCid: string, nodes: Map<string, any>, key: string): string |
 	}
 }
 
-export type Verified = { did: string; handle: string; profile: Profile; rev: string; time: number };
+export type Verified = {
+	did: string;
+	handle: string;
+	profile: Profile;
+	rev: string;
+	time: number;
+	plcSigner: string; // did:key of the anchor rotation key that signed the account's latest PLC op
+};
+
+function pubToDidKey(pub: Uint8Array): string {
+	return 'did:key:' + base58btc.encode(new Uint8Array([...SECP256K1_PREFIX, ...pub]));
+}
 
 const TID_ALPHABET = '234567abcdefghijklmnopqrstuvwxyz';
 
@@ -154,6 +165,7 @@ export function verifyProof(
 		handle,
 		rev: commit.rev,
 		time,
+		plcSigner: pubToDidKey(lastSigner),
 		profile: {
 			description: profile.description,
 			displayName: profile.displayName,

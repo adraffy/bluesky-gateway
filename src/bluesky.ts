@@ -24,6 +24,15 @@ export type Proof = {
 };
 
 const HANDLE_LABEL = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+
+/** "adraffy", "@adraffy", "adraffy.bsky.social" or "@Adraffy.bsky.social" -> "adraffy.bsky.social" */
+export function normalizeHandle(input: string): string {
+	let s = input.trim().toLowerCase();
+	if (s.startsWith('@')) s = s.slice(1);
+	const label = s.endsWith(HANDLE_SUFFIX) ? s.slice(0, -HANDLE_SUFFIX.length) : s;
+	if (!HANDLE_LABEL.test(label)) throw new Error(`invalid bsky.social username: ${input}`);
+	return label + HANDLE_SUFFIX;
+}
 const DID_PLC = /^did:plc:[a-z2-7]{24}$/;
 
 async function fetchOk(url: string): Promise<Response> {

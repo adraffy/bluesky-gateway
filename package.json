@@ -6,7 +6,8 @@
     "build": "forge build",
     "test": "bun test && forge test",
     "fixture": "bun scripts/fixture.ts",
-    "serve": "bun scripts/serve.ts"
+    "serve": "bun scripts/serve.ts",
+    "prove": "bun scripts/prove.ts"
   },
   "dependencies": {
     "@adraffy/ezccip": "^0.2.0",

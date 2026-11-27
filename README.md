@@ -26,7 +26,8 @@ Records (users edit these in the bsky.app profile editor):
   `BlueskyRecords` (record mapping), `CBOR`, `Encoding`, `Secp256k1`
 - `src/bluesky.ts` — fetches proofs; `src/verify.ts` — TS reference verifier; `src/records.ts` —
   record mapping (mirrors `BlueskyRecords.sol`); `src/gateway.ts` — ezccip gateway
-- `scripts/serve.ts` — runs the gateway; `scripts/fixture.ts` — records a live proof into
+- `scripts/serve.ts` — runs the gateway; `scripts/prove.ts` — CLI that fetches and verifies a
+  profile; `scripts/fixture.ts` — records a live proof into
   `test/fixtures/`
 
 ### Commands
@@ -39,6 +40,7 @@ bun test                               # TS unit + e2e (anvil + gateway + live b
 forge test                             # Solidity tests against test/fixtures
 bun scripts/fixture.ts adraffy.bsky.social
 bun scripts/serve.ts                   # gateway on :8016
+bun scripts/prove.ts adraffy           # fetch + verify a profile, show its ENS records (--json, --max-age)
 ```
 
 ### Deploying

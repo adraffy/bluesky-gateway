@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Build contracts (Solar)
+        run: forge build
+
+      - name: Type check
+        run: bunx tsc -p .
+
+      - name: Lint
+        run: bunx biome ci .
+
+      - name: Solidity tests
+        run: forge test
+
+      # includes the e2e test: anvil + gateway + live Bluesky data
+      - name: TypeScript tests
+        run: bun test

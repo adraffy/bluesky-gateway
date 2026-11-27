@@ -1,5 +1,7 @@
 # bluesky-gateway
 
+[![CI](https://github.com/adraffy/bluesky-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/adraffy/bluesky-gateway/actions/workflows/ci.yml)
+
 ENS resolver + CCIP-Read gateway that proves records from Bluesky profiles. Protocol, trust
 assumptions and limitations: [docs/protocol.md](docs/protocol.md). Gas: [docs/gas.md](docs/gas.md).
 

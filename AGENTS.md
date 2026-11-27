@@ -17,7 +17,7 @@ bunx tsc -p .                          # type check
 forge test                             # Solidity tests (offline, uses test/fixtures)
 bun test                               # TS unit tests + e2e (anvil + gateway + live Bluesky data)
 bun scripts/fixture.ts adraffy.bsky.social   # re-record a live fixture
-bun src/serve.ts                       # run the gateway on :8016
+bun scripts/serve.ts                   # run the gateway on :8016
 ```
 
 Run all three checks (tsc, forge test, bun test) before finishing a change. The e2e test needs network
@@ -31,8 +31,9 @@ access and fails if Bluesky is unreachable or the fixture account changes.
 - `contracts/CBOR.sol`, `Encoding.sol`, `Secp256k1.sol`: DAG-CBOR reader, base32/base64url/TID/CID,
   `did:key` → address and ECDSA.
 - `src/bluesky.ts`: fetches proofs. `src/verify.ts`: TS reference verifier. `src/records.ts`: record
-  mapping. `src/gateway.ts` / `src/serve.ts`: gateway (`@adraffy/ezccip`).
-- `scripts/fixture.ts`: records live proofs (plus a rogue self-signed DID) into `test/fixtures/`.
+  mapping. `src/gateway.ts`: gateway (`@adraffy/ezccip`).
+  `src/` is library code with no side effects; entry points go in `scripts/`.
+- `scripts/serve.ts`: runs the gateway. `scripts/fixture.ts`: records live proofs (plus a rogue self-signed DID) into `test/fixtures/`.
 - `test/sol/`: forge tests. `test/*.test.ts`: bun tests.
 
 ## Rules

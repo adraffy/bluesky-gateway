@@ -25,8 +25,9 @@ Records (users edit these in the bsky.app profile editor):
 - `contracts/` — `BlueskyResolver` (ENSIP-10 + OffchainLookup), `BlueskyVerifier` (PLC, commit, MST),
   `BlueskyRecords` (record mapping), `CBOR`, `Encoding`, `Secp256k1`
 - `src/bluesky.ts` — fetches proofs; `src/verify.ts` — TS reference verifier; `src/records.ts` —
-  record mapping (mirrors `BlueskyRecords.sol`); `src/gateway.ts` / `src/serve.ts` — ezccip gateway
-- `scripts/fixture.ts` — records a live proof into `test/fixtures/`
+  record mapping (mirrors `BlueskyRecords.sol`); `src/gateway.ts` — ezccip gateway
+- `scripts/serve.ts` — runs the gateway; `scripts/fixture.ts` — records a live proof into
+  `test/fixtures/`
 
 ### Commands
 
@@ -37,7 +38,7 @@ bun install && forge build
 bun test                               # TS unit + e2e (anvil + gateway + live bsky data)
 forge test                             # Solidity tests against test/fixtures
 bun scripts/fixture.ts adraffy.bsky.social
-bun src/serve.ts                       # gateway on :8016
+bun scripts/serve.ts                   # gateway on :8016
 ```
 
 ### Deploying

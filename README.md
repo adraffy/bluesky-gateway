@@ -1,0 +1,57 @@
+# bluesky-gateway
+
+ENS resolver + CCIP-Read gateway that proves records from Bluesky profiles. Protocol, trust
+assumptions and limitations: [docs/protocol.md](docs/protocol.md).
+
+## How it works
+
+`{label}.<parent>` resolves to records proven from `{label}.bsky.social`'s signed atproto repo:
+bsky.app PLC chain (anchor) → account PLC chain signed by an anchor key and claiming the handle →
+signing key → signed commit → MST → profile + link records, all verified on-chain. The gateway is
+unsigned (ezccip `raw` protocol) and untrusted.
+
+Records (users edit these in the bsky.app profile editor):
+
+| ENS | Source |
+|---|---|
+| `addr(60)`, `addr(0x80000000)` | profile link titled `eth` whose URL ends in `/0x…40 hex`, else `eth:0x…` in the bio |
+| `text(name)` / `text(description)` | display name / bio |
+| `text(avatar)` | avatar blob → `cdn.bsky.app` URL |
+| `text(com.github)`, `text(com.twitter)` | profile links to github.com / x.com / twitter.com |
+| `text(url)` | first other profile link |
+
+### Layout
+
+- `contracts/` — `BlueskyResolver` (ENSIP-10 + OffchainLookup), `BlueskyVerifier` (PLC, commit, MST),
+  `BlueskyRecords` (record mapping), `CBOR`, `Encoding`, `Secp256k1`
+- `src/bluesky.ts` — fetches proofs; `src/verify.ts` — TS reference verifier; `src/records.ts` —
+  record mapping (mirrors `BlueskyRecords.sol`); `src/gateway.ts` / `src/serve.ts` — ezccip gateway
+- `scripts/fixture.ts` — records a live proof into `test/fixtures/`
+
+### Commands
+
+```bash
+bun install && forge build
+bun test                               # TS unit + e2e (anvil + gateway + live bsky data)
+forge test                             # Solidity tests against test/fixtures
+bun scripts/fixture.ts adraffy.bsky.social
+bun src/serve.ts                       # gateway on :8016
+```
+
+### Deploying
+
+`BlueskyResolver(urls, parent, anchorDid, maxAge)`:
+
+- `urls`: gateway endpoints (owner can change)
+- `parent`: namehash of the parent name (owner can add more)
+- `anchorDid`: `did:plc:z72i7hdynmk6r22z27h6tvur` (bsky.app); its rotation keys are the trusted PLC
+  signers
+- `maxAge`: reject commits older than this many seconds, or 0 for no limit. Bounds stale-record
+  replay, but accounts that haven't posted, liked, followed or edited their profile within the window
+  stop resolving.
+
+### Trust and limits
+
+See [docs/protocol.md](docs/protocol.md) §5 (trust assumptions) and §6 (limitations). In short: the
+trust root is Bluesky's PLC key (via the bsky.app anchor); the gateway can withhold or serve older
+valid data, but can't forge records.

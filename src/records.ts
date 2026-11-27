@@ -6,12 +6,18 @@ export const COIN_ETH = 60n;
 export const COIN_DEFAULT_EVM = 0x80000000n; // ENSIP-19 default EVM address
 export const COIN_BASE = 0x80000000n | 8453n; // ENSIP-11: 0x80000000 | chainId
 export const COIN_ARBITRUM = 0x80000000n | 42161n;
+export const COIN_LINEA = 0x80000000n | 59144n;
+export const COIN_CELO = 0x80000000n | 42220n;
+export const COIN_OPTIMISM = 0x80000000n | 10n;
 
 // block explorers whose address pages map to a coin type: {prefix}0x<40 hex>[#default]
 export const EXPLORERS: [prefix: string, coinType: bigint][] = [
 	['https://etherscan.io/address/', COIN_ETH],
 	['https://basescan.org/address/', COIN_BASE],
 	['https://arbiscan.io/address/', COIN_ARBITRUM],
+	['https://lineascan.build/address/', COIN_LINEA],
+	['https://celoscan.io/address/', COIN_CELO],
+	['https://optimistic.etherscan.io/address/', COIN_OPTIMISM],
 ];
 const DEFAULT_SUFFIX = '#default'; // a URL fragment, so the explorer never sees it
 

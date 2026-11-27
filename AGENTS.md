@@ -49,6 +49,9 @@ access and fails if Bluesky is unreachable or the fixture account changes.
   commitments.
 - **Bluesky only.** `*.bsky.social` handles, `did:plc`, secp256k1 keys.
 - **Use `@adraffy/ezccip`**, not `@resolverworks/ezccip`.
+- **Use viem, not ethers.** Don't import or depend on ethers directly. Tests may use
+  `@adraffy/blocksmith` (currently ethers-based internally) to launch anvil and deploy; do calls and
+  encoding with viem and ezccip's `resolverAbi`.
 - Treat everything the gateway returns as hostile input: bounded parsing, explicit reverts, no
   trust in ordering beyond what hashes and signatures prove.
 - Watch gas: verification is about 0.9M gas in `eth_call` (`forge test --match-contract Gas -vv`,

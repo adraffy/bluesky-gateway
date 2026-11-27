@@ -1,7 +1,7 @@
 // CCIP-Read gateway: serves proveProfile(handle) for BlueskyResolver using @adraffy/ezccip.
 // Unsigned ("raw" protocol): the resolver verifies everything, including handle -> did.
 
-import { EZCCIP, CCIPReadError } from '@adraffy/ezccip';
+import { CCIPReadError, EZCCIP } from '@adraffy/ezccip';
 import { bytesToHex } from 'viem';
 import { fetchAnchor, fetchProof, HANDLE_SUFFIX, type Proof } from './bluesky.js';
 

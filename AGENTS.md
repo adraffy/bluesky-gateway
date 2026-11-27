@@ -14,6 +14,7 @@ behavior: it is the spec, including trust assumptions and limitations.
 ```bash
 bun install && forge build
 bunx tsc -p .                          # type check
+bun run lint                           # biome: lint + format check (bun run format to fix)
 forge test                             # Solidity tests (offline, uses test/fixtures)
 bun test                               # TS unit tests + e2e (anvil + gateway + live Bluesky data)
 bun scripts/fixture.ts adraffy.bsky.social   # re-record a live fixture
@@ -21,7 +22,7 @@ bun scripts/serve.ts                   # run the gateway on :8016
 bun scripts/prove.ts adraffy           # fetch + verify a profile, print its ENS records
 ```
 
-Run all three checks (tsc, forge test, bun test) before finishing a change. The e2e test needs network
+Run all four checks (tsc, lint, forge test, bun test) before finishing a change. The e2e test needs network
 access and fails if Bluesky is unreachable or the fixture account changes.
 
 ## Layout
@@ -49,9 +50,12 @@ access and fails if Bluesky is unreachable or the fixture account changes.
   commitments.
 - **Bluesky only.** `*.bsky.social` handles, `did:plc`, secp256k1 keys.
 - **Use `@adraffy/ezccip`**, not `@resolverworks/ezccip`.
+- **Use viem, not ethers.** Don't import or depend on ethers directly. Tests may use
+  `@adraffy/blocksmith` (currently ethers-based internally) to launch anvil and deploy; do calls and
+  encoding with viem and ezccip's `resolverAbi`.
 - Treat everything the gateway returns as hostile input: bounded parsing, explicit reverts, no
   trust in ordering beyond what hashes and signatures prove.
-- Watch gas: verification is about 1.0M gas in `eth_call` (`forge test --match-contract Gas -vv`,
+- Watch gas: verification is about 0.9M gas in `eth_call` (`forge test --match-contract Gas -vv`,
   see `docs/gas.md`). Avoid per-byte loops over `bytes memory`
   where fixed-width arithmetic works (see `Secp256k1.didKeyToAddress`).
 - Update `docs/protocol.md` when behavior, trust assumptions or limitations change.
@@ -59,4 +63,5 @@ access and fails if Bluesky is unreachable or the fixture account changes.
 ## Style
 
 - Solidity: `^0.8.28`, compiled with Solar (`solc = "solar:0.3.1"` in foundry.toml; no via-IR needed), custom errors, NatSpec on public surface. It also builds with solc 0.8.30, but only with `via_ir = true` (stack too deep otherwise).
-- TypeScript: ESM, strict, tabs, single quotes, run with bun.
+- TypeScript: ESM, strict, run with bun, formatted and linted by Biome (`biome.json`: tabs, single quotes,
+  120 columns, recommended rules). Type decoded atproto data with `src/atproto.ts` instead of `any`.

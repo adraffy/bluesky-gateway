@@ -7,10 +7,11 @@
 
 import { parseArgs } from 'node:util';
 import { bytesToHex, encodeFunctionResult, parseAbi } from 'viem';
-import { fetchProof, normalizeHandle, ANCHOR_DID, type Proof } from '../src/bluesky.js';
-import { verifyProof, type Verified } from '../src/verify.js';
-import { addr, text, COIN_ETH } from '../src/records.js';
+import { errorMessage } from '../src/atproto.js';
+import { ANCHOR_DID, fetchProof, normalizeHandle, type Proof } from '../src/bluesky.js';
 import { PROVE_PROFILE } from '../src/gateway.js';
+import { addr, COIN_ETH, text } from '../src/records.js';
+import { type Verified, verifyProof } from '../src/verify.js';
 
 const TEXT_KEYS = ['name', 'description', 'avatar', 'url', 'com.github', 'com.twitter'];
 
@@ -62,8 +63,8 @@ function ago(sec: number): string {
 let handle: string;
 try {
 	handle = normalizeHandle(positionals[0]);
-} catch (err: any) {
-	console.error(err.message);
+} catch (err) {
+	console.error(errorMessage(err));
 	process.exit(2);
 }
 
@@ -98,7 +99,10 @@ try {
 		row('plc', `${plural(proof.ops.length, 'op')}, latest signed by ${v.plcSigner}`);
 		row('anchor', `${ANCHOR_DID} (bsky.app, ${plural(proof.anchor.length, 'op')})`);
 		row('commit', `${v.rev}  ${new Date(v.time * 1000).toISOString()}  (${ago(v.time)})`);
-		row('proof', `${(response.length - 2) / 2} bytes (${plural(proof.nodes.length, 'MST node')}, ${plural(proof.links.length, 'link')})`);
+		row(
+			'proof',
+			`${(response.length - 2) / 2} bytes (${plural(proof.nodes.length, 'MST node')}, ${plural(proof.links.length, 'link')})`
+		);
 		console.log('\nrecords');
 		for (const [k, val] of Object.entries(recs)) row(`  ${k}`, val ?? '—');
 		if (v.profile.links.length) {
@@ -107,7 +111,7 @@ try {
 		}
 		console.log(`\n✓ verified${maxAge ? ` (max-age ${maxAge}s)` : ''}`);
 	}
-} catch (err: any) {
-	console.error(`✗ ${handle}: ${err.message}`);
+} catch (err) {
+	console.error(`✗ ${handle}: ${errorMessage(err)}`);
 	process.exit(1);
 }

@@ -94,7 +94,7 @@ library BlueskyVerifier {
     {
         if (ops.length == 0) revert InvalidPLC(0);
         did = bytes.concat("did:plc:", CBOR.slice(Encoding.base32(abi.encodePacked(sha256(ops[0]))), 0, 24));
-        rotation = _rotationKeys(ops[0]);
+        rotation = _rotationKeys(ops[0]); // the genesis op is signed by its own rotation keys
         for (uint256 i; i < ops.length; i++) {
             bytes memory op = ops[i];
             CBOR.requireSingle(op);
@@ -111,7 +111,7 @@ library BlueskyVerifier {
             bytes32 digest = sha256(CBOR.without(op, "sig"));
             lastSigner = _findSigner(digest, sig, rotation);
             if (lastSigner == address(0)) revert InvalidPLC(i);
-            rotation = _rotationKeys(op);
+            if (i > 0) rotation = _rotationKeys(op); // op 0's keys were decoded before the loop
         }
     }
 

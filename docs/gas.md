@@ -48,12 +48,12 @@ resolution.
 
 | Record             | Gas   |
 | ------------------ | ----- |
-| `addr(node)`       | 7,956 |
-| `addr(node, 60)`   | 8,559 |
+| `addr(node)`       | 8,516 |
+| `addr(node, 60)`   | 9,120 |
 | `text(avatar)`     | 1,845 |
 | `text(com.github)` | 3,516 |
 
-Records are cheap; verification is everything. `addr` checks each link against 3 explorers.
+Records are cheap; verification is everything. `addr` checks each link against 6 explorers.
 
 ## Multicall
 
@@ -62,11 +62,11 @@ round trip. `resolveCallback` execution gas (Solar):
 
 | Records (k) | k separate resolutions | one multicall | saving |
 | ----------- | ---------------------- | ------------- | ------ |
-| 1           | 899,141                | 901,683       | —      |
-| 2           | 1,800,820              | 912,475       | 49%    |
-| 4           | 3,594,415              | 920,193       | 74%    |
-| 6           | 5,408,070              | 938,485       | 83%    |
-| 8           | 7,231,954              | 953,190       | 87%    |
+| 1           | 899,853                | 902,397       | —      |
+| 2           | 1,802,245              | 913,917       | 49%    |
+| 4           | 3,595,840              | 921,652       | 74%    |
+| 6           | 5,410,213              | 940,718       | 83%    |
+| 8           | 7,234,097              | 955,463       | 87%    |
 
 Each extra record in a multicall costs roughly 5–10k gas. Separate resolutions also cost k gateway
 round trips and k × (21k intrinsic + ~63k calldata). The ENS UniversalResolver uses the multicall

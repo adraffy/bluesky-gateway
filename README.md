@@ -14,15 +14,14 @@ unsigned (ezccip `raw` protocol) and untrusted.
 
 Records (users edit these in the bsky.app profile editor):
 
-| ENS                                     | Source                                                                                                                                          |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `addr(60)`                              | profile link to `https://etherscan.io/address/0x…`                                                                                              |
-| `addr(0x80002105)`, `addr(0x8000a4b1)`  | profile link to `https://basescan.org/address/0x…` (Base) / `https://arbiscan.io/address/0x…` (Arbitrum One)                                    |
-| `addr(0x80000000)` (default EVM)        | an explorer link ending in `#default`, eg. `https://etherscan.io/address/0x…#default`; also the fallback for any EVM chain without its own link |
-| `text(name)` / `text(description)`      | display name / bio                                                                                                                              |
-| `text(avatar)`                          | avatar blob → `cdn.bsky.app` URL                                                                                                                |
-| `text(com.github)`, `text(com.twitter)` | profile links to github.com / x.com / twitter.com                                                                                               |
-| `text(url)`                             | first other profile link                                                                                                                        |
+| ENS                                     | Source                                                                                                                                                                         |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `addr(60)` and other chains             | profile link to the chain's block explorer, eg. `https://etherscan.io/address/0x…`, `https://basescan.org/address/0x…` (Ethereum, OP Mainnet, Base, Arbitrum One, Linea, Celo) |
+| `addr(0x80000000)` (default EVM)        | an explorer link ending in `#default`, eg. `https://etherscan.io/address/0x…#default`; also the fallback for any EVM chain without its own link                                |
+| `text(name)` / `text(description)`      | display name / bio                                                                                                                                                             |
+| `text(avatar)`                          | avatar blob → `cdn.bsky.app` URL                                                                                                                                               |
+| `text(com.github)`, `text(com.twitter)` | profile links to github.com / x.com / twitter.com                                                                                                                              |
+| `text(url)`                             | first other profile link                                                                                                                                                       |
 
 All of these can be requested together with `resolve(name, multicall([...]))` (ERC-7996 feature
 `eth.ens.resolver.extended.multicall`): one gateway round trip, one verification.
@@ -32,10 +31,11 @@ All of these can be requested together with `resolve(name, multicall([...]))` (E
 - `contracts/` — `BlueskyResolver` (ENSIP-10 + OffchainLookup), `BlueskyVerifier` (PLC, commit, MST),
   `BlueskyRecords` (record mapping), `CBOR`, `Encoding`, `Secp256k1`
 - `src/bluesky.ts` — fetches proofs; `src/verify.ts` — TS reference verifier; `src/records.ts` —
-  record mapping (mirrors `BlueskyRecords.sol`); `src/gateway.ts` — ezccip gateway
+  record mapping (mirrors `BlueskyRecords.sol`); `src/gateway.ts` — ezccip gateway; `src/atproto.ts`
+  — atproto record types
 - `scripts/serve.ts` — runs the gateway; `scripts/prove.ts` — CLI that fetches and verifies a
-  profile; `scripts/fixture.ts` — records a live proof into
-  `test/fixtures/`
+  profile; `scripts/fixture.ts` — records a live proof into `test/fixtures/`
+- `test/sol/` — forge tests (incl. `Gas.t.sol`); `test/*.test.ts` — bun tests (incl. a live e2e)
 
 ### Commands
 
@@ -43,9 +43,11 @@ Contracts compile with [Solar](https://github.com/paradigmxyz/solar) (`solc = "s
 
 ```bash
 bun install && forge build
+bunx tsc -p .                          # type check
 bun run lint                           # biome lint + format check (bun run format to fix)
 bun test                               # TS unit + e2e (anvil + gateway + live bsky data)
 forge test                             # Solidity tests against test/fixtures
+forge test --match-contract Gas -vv    # gas breakdown (see docs/gas.md)
 bun scripts/fixture.ts adraffy.bsky.social
 bun scripts/serve.ts                   # gateway on :8016
 bun scripts/prove.ts adraffy           # fetch + verify a profile, show its ENS records (--json, --max-age)

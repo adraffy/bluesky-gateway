@@ -28,32 +28,37 @@ ENS client ──► BlueskyResolver.resolveCallback(response)
 Users set these in the bsky.app profile editor (links require pressing Save). To set an address,
 add a profile link to its block explorer page.
 
-| ENS query                               | Source                                                                                   |
-| --------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `addr(node)`, `addr(node, 60)`          | first link to `https://etherscan.io/address/0x…`                                         |
-| `addr(node, 0x80002105)` (Base)         | first link to `https://basescan.org/address/0x…`                                         |
-| `addr(node, 0x8000a4b1)` (Arbitrum One) | first link to `https://arbiscan.io/address/0x…`                                          |
-| `addr(node, 0x80000000)` (default EVM)  | first explorer link ending in `?default`, eg. `https://etherscan.io/address/0x…?default` |
-| `addr(node, other)`                     | empty                                                                                    |
-| `text(name)`                            | `displayName`                                                                            |
-| `text(description)`                     | `description` (bio)                                                                      |
-| `text(avatar)`                          | `https://cdn.bsky.app/img/avatar/plain/{did}/{avatarCid}@jpeg`                           |
-| `text(com.github)`                      | first path segment of the first link to `https://github.com/…`                           |
-| `text(com.twitter)`                     | first path segment of the first link to `https://x.com/…` or `https://twitter.com/…`     |
-| `text(url)`                             | first link that is neither an explorer address link nor one of the above                 |
-| other `text` keys                       | empty                                                                                    |
-| other selectors                         | revert `UnsupportedResolverProfile`                                                      |
+| ENS query                                              | Source                                                                                   |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `addr(node)`, `addr(node, 60)`                         | first link to `https://etherscan.io/address/0x…`, else the default                       |
+| `addr(node, 0x80002105)` (Base)                        | first link to `https://basescan.org/address/0x…`, else the default                       |
+| `addr(node, 0x8000a4b1)` (Arbitrum One)                | first link to `https://arbiscan.io/address/0x…`, else the default                        |
+| `addr(node, 0x80000000)` (default EVM)                 | first explorer link ending in `#default`, eg. `https://etherscan.io/address/0x…#default` |
+| `addr(node, 0x80000000 \| chainId)` (other EVM chains) | the default                                                                              |
+| `addr(node, other)` (non-EVM)                          | empty                                                                                    |
+| `text(name)`                                           | `displayName`                                                                            |
+| `text(description)`                                    | `description` (bio)                                                                      |
+| `text(avatar)`                                         | `https://cdn.bsky.app/img/avatar/plain/{did}/{avatarCid}@jpeg`                           |
+| `text(com.github)`                                     | first path segment of the first link to `https://github.com/…`                           |
+| `text(com.twitter)`                                    | first path segment of the first link to `https://x.com/…` or `https://twitter.com/…`     |
+| `text(url)`                                            | first link that is neither an explorer address link nor one of the above                 |
+| other `text` keys                                      | empty                                                                                    |
+| other selectors                                        | revert `UnsupportedResolverProfile`                                                      |
 
 ### Addresses and links
 
 Address links must be exactly `https://{explorer}/address/0x` + 40 hex digits, optionally followed by
-`?default` (no trailing slash, no other query, no subdomains or testnets). The link's title is
-ignored: the explorer's host picks the coin type. The bio is not parsed.
+`#default` (no trailing slash, no query, no other fragment, no subdomains or testnets). The link's
+title is ignored: the explorer's host picks the coin type. The bio is not parsed.
 
 The default EVM address ([ENSIP-19](https://docs.ens.domains/ensip/19)) is opt-in: only a link
-marked `?default` provides it, and that link still counts for its own chain. The resolver never falls
-back between coin types; clients fall back from a chain to the default themselves. Without `?default`,
-a mainnet-only contract wallet (eg. a Safe) would otherwise be advertised on every EVM chain.
+marked `#default` provides it (the first one, if several), and that link still counts for its own
+chain. `#default` is a URL fragment, so the explorer never sees it; Bluesky stores it as typed. Without
+an explicit marker, a mainnet-only contract wallet (eg. a Safe) would be advertised on every EVM chain.
+
+Fallback matches ENS's `AddrResolver`: an EVM coin type (`chainFromCoinType(coinType) > 0`, ie. coin
+type 60 or `0x80000000 | chainId`) with no link for its chain returns the default address. That covers
+chains without explorer support (eg. Optimism `0x8000000a`). Non-EVM coin types never fall back.
 
 Links are considered in profile display order. The mapping lives in
 [`BlueskyRecords.sol`](../contracts/BlueskyRecords.sol) and is mirrored in

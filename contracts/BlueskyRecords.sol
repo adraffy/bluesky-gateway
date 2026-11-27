@@ -18,7 +18,8 @@ library BlueskyRecords {
     uint256 constant COIN_BASE = 0x80000000 | 8453; // ENSIP-11: 0x80000000 | chainId
     uint256 constant COIN_ARBITRUM = 0x80000000 | 42161;
 
-    bytes constant DEFAULT_SUFFIX = "?default";
+    /// @notice marks the default EVM address; a URL fragment, so the explorer never sees it
+    bytes constant DEFAULT_SUFFIX = "#default";
 
     bytes constant AVATAR_CDN = "https://cdn.bsky.app/img/avatar/plain/";
 
@@ -89,17 +90,33 @@ library BlueskyRecords {
         ];
     }
 
-    /// @notice address for `coinType` from the first matching explorer link, in profile order.
-    /// `COIN_DEFAULT_EVM` comes only from a link marked `?default`; there is no fallback between coin types.
+    /// @notice address for `coinType`, like ENS's `AddrResolver`: the first explorer link for that chain
+    /// (in profile order), else, for any EVM coin type, the first link marked `#default`.
+    /// `COIN_DEFAULT_EVM` itself comes only from a `#default` link.
     function addr(BlueskyVerifier.Profile memory p, uint256 coinType) internal pure returns (bool, address) {
+        if (coinType != COIN_DEFAULT_EVM) {
+            for (uint256 i; i < p.links.length; i++) {
+                (bool ok, uint256 linkCoin,, address a) = _addressLink(p.links[i].url);
+                if (ok && linkCoin == coinType) return (true, a);
+            }
+            if (chainFromCoinType(coinType) == 0) return (false, address(0)); // non-EVM: no default
+        }
         for (uint256 i; i < p.links.length; i++) {
-            (bool ok, uint256 linkCoin, bool isDefault, address a) = _addressLink(p.links[i].url);
-            if (ok && (coinType == COIN_DEFAULT_EVM ? isDefault : linkCoin == coinType)) return (true, a);
+            (bool ok,, bool isDefault, address a) = _addressLink(p.links[i].url);
+            if (ok && isDefault) return (true, a);
         }
         return (false, address(0));
     }
 
-    /// @notice parses "{explorer}/address/0x<40 hex>" with an optional "?default" suffix
+    /// @notice ENSIP-19 `chainFromCoinType`: 1 for coin type 60, the chain id for `0x80000000 | chainId`,
+    /// else 0 (non-EVM, or the default coin type itself)
+    function chainFromCoinType(uint256 coinType) internal pure returns (uint256) {
+        if (coinType == COIN_ETH) return 1;
+        coinType ^= COIN_DEFAULT_EVM;
+        return coinType < COIN_DEFAULT_EVM ? coinType : 0;
+    }
+
+    /// @notice parses "{explorer}/address/0x<40 hex>" with an optional "#default" suffix
     /// @return ok, the explorer's coin type, whether it's marked default, and the address
     function _addressLink(bytes memory url) private pure returns (bool, uint256, bool, address) {
         Explorer[3] memory explorers = _explorers();

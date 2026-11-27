@@ -14,15 +14,15 @@ unsigned (ezccip `raw` protocol) and untrusted.
 
 Records (users edit these in the bsky.app profile editor):
 
-| ENS                                     | Source                                                                                                       |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `addr(60)`                              | profile link to `https://etherscan.io/address/0x…`                                                           |
-| `addr(0x80002105)`, `addr(0x8000a4b1)`  | profile link to `https://basescan.org/address/0x…` (Base) / `https://arbiscan.io/address/0x…` (Arbitrum One) |
-| `addr(0x80000000)` (default EVM)        | an explorer link ending in `?default`, eg. `https://etherscan.io/address/0x…?default`                        |
-| `text(name)` / `text(description)`      | display name / bio                                                                                           |
-| `text(avatar)`                          | avatar blob → `cdn.bsky.app` URL                                                                             |
-| `text(com.github)`, `text(com.twitter)` | profile links to github.com / x.com / twitter.com                                                            |
-| `text(url)`                             | first other profile link                                                                                     |
+| ENS                                     | Source                                                                                                                                          |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `addr(60)`                              | profile link to `https://etherscan.io/address/0x…`                                                                                              |
+| `addr(0x80002105)`, `addr(0x8000a4b1)`  | profile link to `https://basescan.org/address/0x…` (Base) / `https://arbiscan.io/address/0x…` (Arbitrum One)                                    |
+| `addr(0x80000000)` (default EVM)        | an explorer link ending in `#default`, eg. `https://etherscan.io/address/0x…#default`; also the fallback for any EVM chain without its own link |
+| `text(name)` / `text(description)`      | display name / bio                                                                                                                              |
+| `text(avatar)`                          | avatar blob → `cdn.bsky.app` URL                                                                                                                |
+| `text(com.github)`, `text(com.twitter)` | profile links to github.com / x.com / twitter.com                                                                                               |
+| `text(url)`                             | first other profile link                                                                                                                        |
 
 All of these can be requested together with `resolve(name, multicall([...]))` (ERC-7996 feature
 `eth.ens.resolver.extended.multicall`): one gateway round trip, one verification.

@@ -49,6 +49,7 @@ function records(v: Verified) {
 		'addr(eth)': addr(v.profile, COIN_ETH) ?? null,
 		'addr(base)': addr(v.profile, COIN_BASE) ?? null,
 		'addr(arb1)': addr(v.profile, COIN_ARBITRUM) ?? null,
+		'addr(op)': addr(v.profile, 0x80000000n | 10n) ?? null, // no explorer support: #default fallback only
 		'addr(default)': addr(v.profile, COIN_DEFAULT_EVM) ?? null,
 	};
 	for (const key of TEXT_KEYS) out[key] = text(v.profile, v.did, key) ?? null;

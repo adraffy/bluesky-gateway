@@ -1,12 +1,23 @@
 import { expect, test } from 'bun:test';
-import { addr, COIN_ARBITRUM, COIN_BASE, COIN_DEFAULT_EVM, COIN_ETH, chainFromCoinType, text } from '../src/records.js';
+import {
+	addr,
+	COIN_ARBITRUM,
+	COIN_BASE,
+	COIN_CELO,
+	COIN_DEFAULT_EVM,
+	COIN_ETH,
+	COIN_LINEA,
+	COIN_OPTIMISM,
+	chainFromCoinType,
+	text,
+} from '../src/records.js';
 
 // mirrored by the test_records_* forge tests in test/sol/BlueskyResolver.t.sol
 
 const A = '0x51050ec063d393217B436747617aD1C2285Aeeee';
 const B = '0x000000000000000000000000000000000000dEaD';
 const C = '0x00000000000000000000000000000000000000cc';
-const COIN_OPTIMISM = 0x80000000n | 10n; // no explorer support: only reachable via #default
+const COIN_POLYGON = 0x80000000n | 137n; // no explorer support: only reachable via #default
 const COIN_BTC = 0n;
 
 const links = (...urls: string[]) => ({ links: urls.map((url) => ({ url })) });
@@ -14,7 +25,7 @@ const links = (...urls: string[]) => ({ links: urls.map((url) => ({ url })) });
 test('chainFromCoinType (ENSIP-19)', () => {
 	expect(chainFromCoinType(COIN_ETH)).toBe(1n);
 	expect(chainFromCoinType(COIN_BASE)).toBe(8453n);
-	expect(chainFromCoinType(COIN_OPTIMISM)).toBe(10n);
+	expect(chainFromCoinType(COIN_POLYGON)).toBe(137n);
 	expect(chainFromCoinType(COIN_DEFAULT_EVM)).toBe(0n);
 	expect(chainFromCoinType(COIN_BTC)).toBe(0n);
 	expect(chainFromCoinType(0x100000000n)).toBe(0n);
@@ -24,12 +35,20 @@ test('addr: explorer host picks the coin type; title is ignored', () => {
 	const p = links(
 		`https://etherscan.io/address/${A}`,
 		`https://basescan.org/address/${B}`,
-		`https://arbiscan.io/address/${C}`
+		`https://arbiscan.io/address/${C}`,
+		`https://lineascan.build/address/${B}`,
+		`https://celoscan.io/address/${C}`,
+		`https://optimistic.etherscan.io/address/${A}`
 	);
 	expect(addr(p, COIN_ETH)).toBe(A);
 	expect(addr(p, COIN_BASE)).toBe(B);
 	expect(addr(p, COIN_ARBITRUM)).toBe(C);
-	expect(addr(p, COIN_OPTIMISM)).toBeUndefined(); // no #default
+	expect(addr(p, COIN_LINEA)).toBe(B);
+	expect(addr(p, COIN_CELO)).toBe(C);
+	expect(addr(p, COIN_OPTIMISM)).toBe(A);
+	expect(chainFromCoinType(COIN_LINEA)).toBe(59144n);
+	expect(chainFromCoinType(COIN_CELO)).toBe(42220n);
+	expect(addr(p, COIN_POLYGON)).toBeUndefined(); // no #default
 	expect(addr(p, COIN_DEFAULT_EVM)).toBeUndefined();
 	expect(addr({ links: [{ title: 'whatever', url: `https://etherscan.io/address/${A}` }] }, COIN_ETH)).toBe(A);
 });
@@ -40,7 +59,7 @@ test('addr: #default is the default address and the EVM fallback', () => {
 	expect(addr(p, COIN_ETH)).toBe(A); // its own chain
 	expect(addr(p, COIN_BASE)).toBe(B); // chain-specific link wins over the default
 	expect(addr(p, COIN_ARBITRUM)).toBe(A); // known chain without a link: default
-	expect(addr(p, COIN_OPTIMISM)).toBe(A); // unknown EVM chain: default
+	expect(addr(p, COIN_POLYGON)).toBe(A); // unsupported EVM chain: default
 	expect(addr(p, COIN_BTC)).toBeUndefined(); // non-EVM: no default
 	// any explorer can carry it; mainnet falls back too
 	const q = links(`https://basescan.org/address/${B}#default`);

@@ -17,6 +17,9 @@ library BlueskyRecords {
     uint256 constant COIN_DEFAULT_EVM = 0x80000000; // ENSIP-19 default EVM address
     uint256 constant COIN_BASE = 0x80000000 | 8453; // ENSIP-11: 0x80000000 | chainId
     uint256 constant COIN_ARBITRUM = 0x80000000 | 42161;
+    uint256 constant COIN_LINEA = 0x80000000 | 59144;
+    uint256 constant COIN_CELO = 0x80000000 | 42220;
+    uint256 constant COIN_OPTIMISM = 0x80000000 | 10;
 
     /// @notice marks the default EVM address; a URL fragment, so the explorer never sees it
     bytes constant DEFAULT_SUFFIX = "#default";
@@ -82,11 +85,14 @@ library BlueskyRecords {
     }
 
     /// @notice block explorers whose address pages map to a coin type
-    function _explorers() private pure returns (Explorer[3] memory) {
+    function _explorers() private pure returns (Explorer[6] memory) {
         return [
             Explorer("https://etherscan.io/address/", COIN_ETH),
             Explorer("https://basescan.org/address/", COIN_BASE),
-            Explorer("https://arbiscan.io/address/", COIN_ARBITRUM)
+            Explorer("https://arbiscan.io/address/", COIN_ARBITRUM),
+            Explorer("https://lineascan.build/address/", COIN_LINEA),
+            Explorer("https://celoscan.io/address/", COIN_CELO),
+            Explorer("https://optimistic.etherscan.io/address/", COIN_OPTIMISM)
         ];
     }
 
@@ -119,7 +125,7 @@ library BlueskyRecords {
     /// @notice parses "{explorer}/address/0x<40 hex>" with an optional "#default" suffix
     /// @return ok, the explorer's coin type, whether it's marked default, and the address
     function _addressLink(bytes memory url) private pure returns (bool, uint256, bool, address) {
-        Explorer[3] memory explorers = _explorers();
+        Explorer[6] memory explorers = _explorers();
         for (uint256 i; i < explorers.length; i++) {
             bytes memory prefix = explorers[i].prefix;
             if (url.length < prefix.length + 42 || !CBOR.eqAt(url, 0, prefix.length, prefix)) continue;

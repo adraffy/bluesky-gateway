@@ -22,8 +22,8 @@ bun scripts/serve.ts                   # run the gateway on :8016
 bun scripts/prove.ts adraffy           # fetch + verify a profile, print its ENS records
 ```
 
-Run all four checks (tsc, lint, forge test, bun test) before finishing a change. The e2e test needs network
-access and fails if Bluesky is unreachable or the fixture account changes.
+Run all four checks (tsc, lint, forge test, bun test) before finishing a change. The e2e test needs
+network access and fails if Bluesky is unreachable or the fixture account changes.
 
 ## Layout
 
@@ -33,13 +33,18 @@ access and fails if Bluesky is unreachable or the fixture account changes.
 - `contracts/CBOR.sol`, `Encoding.sol`, `Secp256k1.sol`: DAG-CBOR reader, base32/base64url/TID/CID,
   `did:key` → address and ECDSA.
 - `src/bluesky.ts`: fetches proofs. `src/verify.ts`: TS reference verifier. `src/records.ts`: record
-  mapping. `src/gateway.ts`: gateway (`@adraffy/ezccip`).
+  mapping. `src/gateway.ts`: gateway (`@adraffy/ezccip`). `src/atproto.ts`: atproto record types.
   `src/` is library code with no side effects; entry points go in `scripts/`.
-- `scripts/serve.ts`: runs the gateway. `scripts/prove.ts`: CLI to fetch + verify one account. `scripts/fixture.ts`: records live proofs (plus a rogue self-signed DID) into `test/fixtures/`.
-- `test/sol/`: forge tests. `test/*.test.ts`: bun tests.
+- `scripts/serve.ts`: runs the gateway. `scripts/prove.ts`: CLI to fetch + verify one account.
+  `scripts/fixture.ts`: records live proofs (plus a rogue self-signed DID) into `test/fixtures/`.
+- `test/sol/`: forge tests (`Gas.t.sol` for gas). `test/*.test.ts`: bun tests.
+- `.github/workflows/ci.yml`: runs tsc, `biome ci`, forge test and bun test on PRs and `main`.
 
 ## Rules
 
+- **Adding a chain:** add its explorer to `_explorers()` in `BlueskyRecords.sol` and `EXPLORERS` in
+  `src/records.ts`, plus test cases on both sides and a row in the explorer table in
+  `docs/protocol.md`.
 - **Keep TS and Solidity in sync.** `src/verify.ts` mirrors `BlueskyVerifier.sol`, and
   `src/records.ts` mirrors `BlueskyRecords.sol`. Change both together and add test cases on both
   sides (see the `test_records_*` forge tests and `test/records.test.ts`).
@@ -62,6 +67,8 @@ access and fails if Bluesky is unreachable or the fixture account changes.
 
 ## Style
 
-- Solidity: `^0.8.28`, compiled with Solar (`solc = "solar:0.3.1"` in foundry.toml; no via-IR needed), custom errors, NatSpec on public surface. It also builds with solc 0.8.30, but only with `via_ir = true` (stack too deep otherwise).
+- Solidity: `^0.8.28`, compiled with Solar (`solc = "solar:0.3.1"` in foundry.toml; no via-IR
+  needed), custom errors, NatSpec on public surface. It also builds with solc 0.8.30, but only with
+  `via_ir = true` (stack too deep otherwise).
 - TypeScript: ESM, strict, run with bun, formatted and linted by Biome (`biome.json`: tabs, single quotes,
   120 columns, recommended rules). Type decoded atproto data with `src/atproto.ts` instead of `any`.

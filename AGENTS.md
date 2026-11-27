@@ -18,6 +18,7 @@ forge test                             # Solidity tests (offline, uses test/fixt
 bun test                               # TS unit tests + e2e (anvil + gateway + live Bluesky data)
 bun scripts/fixture.ts adraffy.bsky.social   # re-record a live fixture
 bun scripts/serve.ts                   # run the gateway on :8016
+bun scripts/prove.ts adraffy           # fetch + verify a profile, print its ENS records
 ```
 
 Run all three checks (tsc, forge test, bun test) before finishing a change. The e2e test needs network
@@ -33,7 +34,7 @@ access and fails if Bluesky is unreachable or the fixture account changes.
 - `src/bluesky.ts`: fetches proofs. `src/verify.ts`: TS reference verifier. `src/records.ts`: record
   mapping. `src/gateway.ts`: gateway (`@adraffy/ezccip`).
   `src/` is library code with no side effects; entry points go in `scripts/`.
-- `scripts/serve.ts`: runs the gateway. `scripts/fixture.ts`: records live proofs (plus a rogue self-signed DID) into `test/fixtures/`.
+- `scripts/serve.ts`: runs the gateway. `scripts/prove.ts`: CLI to fetch + verify one account. `scripts/fixture.ts`: records live proofs (plus a rogue self-signed DID) into `test/fixtures/`.
 - `test/sol/`: forge tests. `test/*.test.ts`: bun tests.
 
 ## Rules
